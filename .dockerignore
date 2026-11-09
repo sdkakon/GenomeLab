@@ -1,0 +1,15 @@
+.git
+.github
+.agents
+.pytest_cache
+node_modules
+frontend/node_modules
+__pycache__
+backend/__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.log
+wsl_*.txt
+*.tmp
+.DS_Store

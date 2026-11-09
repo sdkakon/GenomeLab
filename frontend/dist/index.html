@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GenomeLab Enterprise | Visual WGS & Bioinformatics Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      (function() {
+        var jsFile = 'index-BA930nVQ.js';
+        var cssFile = 'index-PJZ8ZPWE.css';
+
+        function loadCSS(url) {
+          var l = document.createElement('link');
+          l.rel = 'stylesheet';
+          l.crossOrigin = '';
+          l.href = url;
+          document.head.appendChild(l);
+        }
+
+        function loadJS(url) {
+          var s = document.createElement('script');
+          s.type = 'module';
+          s.crossOrigin = '';
+          s.src = url;
+          document.head.appendChild(s);
+        }
+
+        // Probe ./assets/ first, fallback to ./ root
+        fetch('./assets/' + jsFile, { method: 'HEAD' })
+          .then(function(r) {
+            if (r.ok) {
+              loadCSS('./assets/' + cssFile);
+              loadJS('./assets/' + jsFile);
+            } else {
+              loadCSS('./' + cssFile);
+              loadJS('./' + jsFile);
+            }
+          })
+          .catch(function() {
+            loadCSS('./' + cssFile);
+            loadJS('./' + jsFile);
+          });
+      })();
+    </script>
+  </head>
+  <body class="bg-[#F8FAFC] text-zinc-900 antialiased selection:bg-zinc-900 selection:text-white">
+    <div id="root"></div>
+  </body>
+</html>
