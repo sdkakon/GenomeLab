@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, Sample, WSLBrowseEntry, ProcessState } from '../types/genome';
-import { browseWSL } from '../services/api';
+import { browseWSL, addSampleToProject } from '../services/api';
 import { ProcessStatusDot } from './ProcessStatusDot';
 import {
   FolderOpen,
@@ -15,6 +15,7 @@ import {
   FileText,
   Download,
   Terminal,
+  ArrowRight,
 } from 'lucide-react';
 
 export interface ProjectCohortViewProps {
@@ -25,7 +26,9 @@ export interface ProjectCohortViewProps {
   onToggleSample: (sampleId: string) => void;
   onSelectAllSamples: (sampleIds: string[]) => void;
   onCreateProject: (name: string, organism: string, wslPath: string, sampleIds?: string, speciesLabel?: string) => void;
+  onProjectUpdated?: (p: Project) => void;
   onNavigateTab: (tab: string) => void;
+  onJumpToStage?: (stageId: number) => void;
   processState?: ProcessState;
 }
 
@@ -34,30 +37,33 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
   selectedSamples,
   onToggleSample,
   onSelectAllSamples,
-  onCreateProject,
+  onProjectUpdated,
   onNavigateTab,
+  onJumpToStage,
   processState,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [hostFilter, setHostFilter] = useState('ALL');
   const [quickStage, setQuickStage] = useState('');
-  const [showWizardModal, setShowWizardModal] = useState(false);
+  const [showAddSampleModal, setShowAddSampleModal] = useState(false);
   const [showBrowserModal, setShowBrowserModal] = useState(false);
   const [selectedSampleDetail, setSelectedSampleDetail] = useState<Sample | null>(null);
 
-  const [newProjectName, setNewProjectName] = useState('Klebsiella_Surveillance_2026');
-  const [newOrganism, setNewOrganism] = useState('bacteria');
-  const [newSpeciesLabel, setNewSpeciesLabel] = useState('Klebsiella pneumoniae');
-  const [newWslPath, setNewWslPath] = useState('/home/soumandeykakon/GenomeLab_Workspaces/Klebsiella_Surveillance_2026');
-  const [newSampleIds, setNewSampleIds] = useState('SAMPLE_01, SAMPLE_02, SRR2584863');
-  const [browsePath, setBrowsePath] = useState('/home/soumandeykakon/NGS_DA');
+  const [sampleInputIds, setSampleInputIds] = useState('SRR2584863, ERR14794390');
+  const [sampleHost, setSampleHost] = useState(activeProject?.organism || 'Sample Isolate');
+  const [sampleCountry, setSampleCountry] = useState('Local Lab');
+  const [sampleYear, setSampleYear] = useState('2026');
+  const [browsePath, setBrowsePath] = useState(activeProject?.wsl_path || '~/NGS_DA');
   const [browsedEntries, setBrowsedEntries] = useState<WSLBrowseEntry[]>([]);
 
   useEffect(() => {
     if (activeProject?.wsl_path) {
       setBrowsePath(activeProject.wsl_path);
     }
-  }, [activeProject?.wsl_path]);
+    if (activeProject?.organism) {
+      setSampleHost(activeProject.organism);
+    }
+  }, [activeProject?.wsl_path, activeProject?.organism]);
 
   useEffect(() => {
     if (showBrowserModal && browsePath) {
@@ -96,17 +102,33 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
     else onSelectAllSamples(Array.from(new Set([...selectedSamples, ...filteredSamples.map((s) => s.id)])));
   };
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleAddSamplesSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProjectName.trim()) return;
-    onCreateProject(
-      newProjectName.trim(),
-      newOrganism,
-      newWslPath.trim(),
-      newSampleIds.trim(),
-      newSpeciesLabel.trim()
-    );
-    setShowWizardModal(false);
+    const ids = sampleInputIds
+      .split(/[\n,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (ids.length === 0) return;
+
+    let currentProj = activeProject;
+    for (const sid of ids) {
+      currentProj = await addSampleToProject(
+        activeProject.id,
+        {
+          id: sid,
+          name: sid,
+          host: sampleHost.trim() || activeProject.organism,
+          country: sampleCountry.trim() || 'Local Lab',
+          year: sampleYear.trim() || '2026',
+        },
+        currentProj
+      );
+    }
+    if (onProjectUpdated) {
+      onProjectUpdated(currentProj);
+    }
+    onSelectAllSamples(Array.from(new Set([...selectedSamples, ...ids])));
+    setShowAddSampleModal(false);
   };
 
   const exportSelectedTsv = () => {
@@ -128,23 +150,28 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
   };
 
   const quickLaunchStages = [
-    { num: 1, name: 'Stage 1: Raw Data (fasterq-dump)' },
-    { num: 2, name: 'Stage 2: Read QC (FastQC)' },
-    { num: 3, name: 'Stage 3: Trimming (fastp)' },
-    { num: 5, name: 'Stage 5: Assembly (SPAdes)' },
-    { num: 7, name: 'Stage 7: Annotation (Prokka)' },
-    { num: 8, name: 'Stage 8: AMR Scan (ABRicate)' },
-    { num: 12, name: 'Stage 12: Phylogeny (IQ-TREE 2)' },
+    { num: 1, name: 'Stage 1: Raw Data Ingestion (fasterq-dump)' },
+    { num: 2, name: 'Stage 2: Read Quality Control (FastQC)' },
+    { num: 3, name: 'Stage 3: Read Trimming & Filtering (fastp)' },
+    { num: 4, name: 'Stage 4: Taxonomic Classification (Kraken2)' },
+    { num: 5, name: 'Stage 5: De Novo Assembly (SPAdes)' },
+    { num: 6, name: 'Stage 6: Assembly Quality (QUAST / CheckM2)' },
+    { num: 7, name: 'Stage 7: Genome Annotation (Prokka / Bakta)' },
+    { num: 8, name: 'Stage 8: AMR & Plasmid Profiling (ABRicate)' },
+    { num: 9, name: 'Stage 9: Sequence Typing (PubMLST)' },
+    { num: 10, name: 'Stage 10: Pan-Genome & FastANI (Roary)' },
+    { num: 11, name: 'Stage 11: Alignment & Variant Calling (Snippy)' },
+    { num: 12, name: 'Stage 12: Phylogenetics & Tree (IQ-TREE 2)' },
   ];
 
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden gap-3">
-      {/* GitHub Repository Action & Filter Toolbar */}
+      {/* Sample Cohort Action & Filter Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
-        {/* Left: Filter Input + Host Dropdown + Quick-Stage Dropdown */}
+        {/* Left: Filter Input + Host Dropdown + Launch Stage Tool Dropdown */}
         <div className="flex items-center gap-2 flex-1 min-w-[260px] flex-wrap">
           <div className="relative flex-1 max-w-md min-w-[200px]">
-            <Search className="w-3.5 h-3.5 text-[#656D76] absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-[#57606A] absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Filter samples by ID, ST, AMR gene, or origin..."
@@ -171,13 +198,20 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
           <select
             value={quickStage}
             onChange={(e) => {
-              setQuickStage(e.target.value);
-              if (e.target.value) onNavigateTab('workbench');
+              const val = e.target.value;
+              setQuickStage(val);
+              if (val) {
+                if (onJumpToStage) {
+                  onJumpToStage(Number(val));
+                } else {
+                  onNavigateTab('workbench');
+                }
+              }
             }}
-            aria-label="Jump to Pipeline Stage"
+            aria-label="Launch Stage Tool"
             className="gh-btn-secondary py-1 px-2.5 cursor-pointer"
           >
-            <option value="">Jump to Stage...</option>
+            <option value="">Launch Stage Tool...</option>
             {quickLaunchStages.map((s) => (
               <option key={s.num} value={s.num}>
                 {s.name}
@@ -186,11 +220,11 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
           </select>
         </div>
 
-        {/* Right: Repository File Actions & Primary Buttons */}
+        {/* Right: Cohort Actions & Primary Execution CTA */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <button onClick={() => setShowBrowserModal(true)} className="gh-btn-secondary">
-            <FolderOpen className="w-3.5 h-3.5 text-[#656D76]" />
-            <span>WSL2 Files</span>
+            <FolderOpen className="w-3.5 h-3.5 text-[#57606A]" />
+            <span>Workspace Files</span>
           </button>
 
           <button
@@ -198,22 +232,22 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
             disabled={selectedSamples.length === 0}
             className="gh-btn-secondary"
           >
-            <Download className="w-3.5 h-3.5 text-[#656D76]" />
+            <Download className="w-3.5 h-3.5 text-[#57606A]" />
             <span>Export TSV</span>
           </button>
 
-          <button onClick={() => setShowWizardModal(true)} className="gh-btn-secondary">
-            <Plus className="w-3.5 h-3.5 text-[#656D76]" />
-            <span>New Project</span>
+          <button onClick={() => setShowAddSampleModal(true)} className="gh-btn-secondary">
+            <Plus className="w-3.5 h-3.5 text-[#57606A]" />
+            <span>Add Samples</span>
           </button>
 
           <button
             onClick={() => onNavigateTab('workbench')}
             disabled={selectedSamples.length === 0}
-            className="gh-btn-primary"
+            className="gh-btn-execute"
           >
             <Play className="w-3.5 h-3.5" />
-            <span>Run Tools ({selectedSamples.length})</span>
+            <span>Configure &amp; Run Tools ({selectedSamples.length})</span>
           </button>
         </div>
       </div>
@@ -298,7 +332,7 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
                               ? 'failed'
                               : isChecked && processState?.status === 'completed'
                               ? 'completed'
-                              : sample.status.includes('Profiled') || sample.status.includes('Ready')
+                              : sample.status.includes('Profiled') || sample.status.includes('Completed')
                               ? 'completed'
                               : 'idle'
                           }
@@ -309,11 +343,11 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
                         />
                         <span>{sample.id}</span>
                       </div>
-                      <div className="text-[11px] text-[#656D76]">{sample.name}</div>
+                      <div className="text-[11px] text-[#57606A]">{sample.status || sample.name}</div>
                     </td>
                     <td className="py-2 px-3">
                       <div className="font-medium text-[#1F2328]">{sample.host || 'Unknown'}</div>
-                      <div className="text-[11px] text-[#656D76]">
+                      <div className="text-[11px] text-[#57606A]">
                         {sample.country || 'Global'} · {sample.year || '2024'}
                       </div>
                     </td>
@@ -325,7 +359,7 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
                     </td>
                     <td className="py-2 px-3 font-mono text-[#24292F]">{sample.contigs || '—'}</td>
                     <td className="py-2 px-3">
-                      <span className="gh-badge font-mono">{sample.st || 'ND'}</span>
+                      <span className="gh-badge font-mono">{sample.st || 'Pending'}</span>
                     </td>
                     <td className="py-2 px-3">
                       <div className="flex flex-wrap gap-1 max-w-[210px]">
@@ -333,16 +367,16 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
                           sample.amr_genes.slice(0, 3).map((gene) => (
                             <span
                               key={gene}
-                              className="px-1.5 py-0.5 text-[10px] bg-[#FFEBE9] text-[#CF222E] border border-[#FF8182]/40 rounded-full font-mono"
+                              className="px-1.5 py-0.5 text-[11px] bg-[#FFEBE9] text-[#CF222E] border border-[#FF8182]/40 rounded-full font-mono"
                             >
                               {gene}
                             </span>
                           ))
                         ) : (
-                          <span className="text-[#8C959F] text-[11px]">None</span>
+                          <span className="text-[#57606A] text-[11px]">None</span>
                         )}
                         {sample.amr_genes && sample.amr_genes.length > 3 && (
-                          <span className="text-[10px] text-[#656D76] font-medium">
+                          <span className="text-[11px] text-[#57606A] font-medium">
                             +{sample.amr_genes.length - 3}
                           </span>
                         )}
@@ -354,13 +388,13 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
                           sample.plasmids.map((p) => (
                             <span
                               key={p}
-                              className="px-1.5 py-0.5 text-[10px] bg-[#DDF4FF] text-[#0969DA] border border-[#54AEFF]/40 rounded-full font-mono"
+                              className="px-1.5 py-0.5 text-[11px] bg-[#DDF4FF] text-[#0969DA] border border-[#54AEFF]/40 rounded-full font-mono"
                             >
                               {p}
                             </span>
                           ))
                         ) : (
-                          <span className="text-[#8C959F] text-[11px]">—</span>
+                          <span className="text-[#57606A] text-[11px]">—</span>
                         )}
                       </div>
                     </td>
@@ -369,7 +403,7 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
                         onClick={() => setSelectedSampleDetail(sample)}
                         className="gh-btn-secondary py-0.5 px-2 text-[11px]"
                       >
-                        Inspect
+                        Details
                       </button>
                     </td>
                   </tr>
@@ -380,87 +414,79 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
         </div>
       </div>
 
-      {/* New Project Modal (GitHub Dialog Style) */}
-      {showWizardModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      {/* Add / Import Samples Modal */}
+      {showAddSampleModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Add Samples to Project"
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+        >
           <div className="gh-box max-w-lg w-full shadow-xl">
             <div className="gh-box-header">
-              <h3 className="font-semibold text-[#1F2328] text-xs">Create New Bioinformatics Repository / Project</h3>
-              <button onClick={() => setShowWizardModal(false)} className="text-[#656D76] hover:text-[#1F2328]">
+              <h3 className="font-semibold text-[#1F2328] text-xs">
+                Add / Import Samples to {activeProject.name}
+              </h3>
+              <button
+                onClick={() => setShowAddSampleModal(false)}
+                aria-label="Close modal"
+                className="text-[#57606A] hover:text-[#1F2328]"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={handleCreateSubmit} className="p-4 space-y-3 text-xs bg-white">
+            <form onSubmit={handleAddSamplesSubmit} className="p-4 space-y-3 text-xs bg-white">
               <div>
-                <label className="block font-semibold text-[#1F2328] mb-1">Project / Repository Name</label>
-                <input
-                  type="text"
-                  value={newProjectName}
-                  onChange={(e) => {
-                    setNewProjectName(e.target.value);
-                    setNewWslPath(
-                      `/home/soumandeykakon/GenomeLab_Workspaces/${e.target.value.trim().replace(/\s+/g, '_') || 'New_Project'}`
-                    );
-                  }}
-                  className="gh-input w-full"
+                <label className="block font-semibold text-[#1F2328] mb-1">
+                  Sample IDs or NCBI SRA Accessions (Comma or Newline Separated)
+                </label>
+                <textarea
+                  rows={3}
+                  value={sampleInputIds}
+                  onChange={(e) => setSampleInputIds(e.target.value)}
+                  placeholder="SRR2584863, ERR14794390, SAMPLE_03"
+                  className="gh-input w-full font-mono"
                   required
                 />
+                <p className="text-[11px] text-[#57606A] mt-1">
+                  Paired-end FASTQ paths will be mapped automatically under <code>{activeProject.wsl_path}/01_raw_data/</code>.
+                </p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
-                  <label className="block font-semibold text-[#1F2328] mb-1">Organism Kingdom</label>
-                  <select
-                    value={newOrganism}
-                    onChange={(e) => setNewOrganism(e.target.value)}
-                    className="gh-input w-full"
-                  >
-                    <option value="bacteria">Bacteria (WGS, AMR, Roary, Snippy)</option>
-                    <option value="human_animal">Human & Animal Diploid</option>
-                    <option value="plant_fungi">Plant & Fungal Genomes</option>
-                    <option value="viral_phage">Viruses & Bacteriophages</option>
-                    <option value="metagenome">Metagenomics</option>
-                    <option value="all">Universal / All Tools</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-[#1F2328] mb-1">Species / Strain Label</label>
+                  <label className="block font-semibold text-[#1F2328] mb-1">Host / Source</label>
                   <input
                     type="text"
-                    value={newSpeciesLabel}
-                    onChange={(e) => setNewSpeciesLabel(e.target.value)}
-                    placeholder="e.g. Escherichia coli"
+                    value={sampleHost}
+                    onChange={(e) => setSampleHost(e.target.value)}
                     className="gh-input w-full"
                   />
                 </div>
-              </div>
-              <div>
-                <label className="block font-semibold text-[#1F2328] mb-1">WSL2 Ubuntu Directory Path</label>
-                <input
-                  type="text"
-                  value={newWslPath}
-                  onChange={(e) => setNewWslPath(e.target.value)}
-                  className="gh-input w-full font-mono"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-[#1F2328] mb-1">
-                  Sample IDs or NCBI SRA Accessions (Comma-Separated)
-                </label>
-                <input
-                  type="text"
-                  value={newSampleIds}
-                  onChange={(e) => setNewSampleIds(e.target.value)}
-                  placeholder="SRR2584863, SAMPLE_01"
-                  className="gh-input w-full font-mono"
-                />
+                <div>
+                  <label className="block font-semibold text-[#1F2328] mb-1">Country / Lab</label>
+                  <input
+                    type="text"
+                    value={sampleCountry}
+                    onChange={(e) => setSampleCountry(e.target.value)}
+                    className="gh-input w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-[#1F2328] mb-1">Collection Year</label>
+                  <input
+                    type="text"
+                    value={sampleYear}
+                    onChange={(e) => setSampleYear(e.target.value)}
+                    className="gh-input w-full font-mono"
+                  />
+                </div>
               </div>
               <div className="flex justify-end gap-2 pt-2 border-t border-[#D0D7DE]">
-                <button type="button" onClick={() => setShowWizardModal(false)} className="gh-btn-secondary">
+                <button type="button" onClick={() => setShowAddSampleModal(false)} className="gh-btn-secondary">
                   Cancel
                 </button>
                 <button type="submit" className="gh-btn-primary">
-                  Create Project
+                  Add to Cohort
                 </button>
               </div>
             </form>
@@ -468,16 +494,25 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
         </div>
       )}
 
-      {/* WSL2 File Browser Modal */}
+      {/* Workspace File Browser Modal */}
       {showBrowserModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Workspace Directory Browser"
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+        >
           <div className="gh-box max-w-xl w-full shadow-xl">
             <div className="gh-box-header">
               <div className="flex items-center gap-2">
-                <HardDrive className="w-4 h-4 text-[#656D76]" />
-                <h3 className="font-semibold text-[#1F2328] text-xs">WSL2 Ubuntu Directory Browser</h3>
+                <HardDrive className="w-4 h-4 text-[#57606A]" />
+                <h3 className="font-semibold text-[#1F2328] text-xs">WSL2 Workspace Directory Browser</h3>
               </div>
-              <button onClick={() => setShowBrowserModal(false)} className="text-[#656D76] hover:text-[#1F2328]">
+              <button
+                onClick={() => setShowBrowserModal(false)}
+                aria-label="Close modal"
+                className="text-[#57606A] hover:text-[#1F2328]"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -510,21 +545,21 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
                       {f.is_dir ? (
                         <FolderOpen className="w-3.5 h-3.5 text-[#54AEFF]" />
                       ) : (
-                        <FileText className="w-3.5 h-3.5 text-[#656D76]" />
+                        <FileText className="w-3.5 h-3.5 text-[#57606A]" />
                       )}{' '}
                       {f.name}
                     </span>
-                    <span className="text-[#656D76] text-[10px] font-mono">{f.size_human || f.file_type}</span>
+                    <span className="text-[#57606A] text-[11px] font-mono">{f.size_human || f.file_type}</span>
                   </div>
                 ))}
                 {browsedEntries.length === 0 && (
-                  <div className="p-4 text-center text-[#656D76]">Empty directory</div>
+                  <div className="p-4 text-center text-[#57606A]">Empty directory</div>
                 )}
               </div>
               <div className="border border-dashed border-[#D0D7DE] rounded-md p-2.5 text-center bg-[#F6F8FA]">
-                <UploadCloud className="w-4 h-4 text-[#656D76] mx-auto mb-0.5" />
+                <UploadCloud className="w-4 h-4 text-[#57606A] mx-auto mb-0.5" />
                 <p className="font-medium text-[#1F2328] text-[11px]">
-                  Place FASTQ / FASTA files in <code>{browsePath}/01_raw_data</code>
+                  Place paired-end FASTQ / FASTA files in <code>{browsePath}/01_raw_data</code>
                 </p>
               </div>
               <div className="flex justify-end gap-2 pt-2 border-t border-[#D0D7DE]">
@@ -539,51 +574,112 @@ export const ProjectCohortView: React.FC<ProjectCohortViewProps> = ({
 
       {/* Sample Details Modal */}
       {selectedSampleDetail && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="gh-box max-w-sm w-full shadow-xl">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Sample Details: ${selectedSampleDetail.id}`}
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+        >
+          <div className="gh-box max-w-md w-full shadow-xl">
             <div className="gh-box-header">
-              <h3 className="font-semibold text-[#1F2328] text-xs font-mono">{selectedSampleDetail.id}</h3>
-              <button onClick={() => setSelectedSampleDetail(null)} className="text-[#656D76] hover:text-[#1F2328]">
+              <h3 className="font-semibold text-[#1F2328] text-xs font-mono">
+                Sample Metadata &amp; Paths — {selectedSampleDetail.id}
+              </h3>
+              <button
+                onClick={() => setSelectedSampleDetail(null)}
+                aria-label="Close modal"
+                className="text-[#57606A] hover:text-[#1F2328]"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-4 space-y-3 text-xs bg-white">
-              <div className="grid grid-cols-2 gap-2 bg-[#F6F8FA] p-2.5 rounded-md border border-[#D0D7DE]">
+              <div className="grid grid-cols-2 gap-2.5 bg-[#F6F8FA] p-3 rounded-md border border-[#D0D7DE]">
                 <div>
-                  <span className="text-[#656D76]">Host:</span>
+                  <span className="text-[#57606A]">Host / Source:</span>
                   <div className="font-semibold text-[#1F2328]">{selectedSampleDetail.host}</div>
                 </div>
                 <div>
-                  <span className="text-[#656D76]">Origin:</span>
+                  <span className="text-[#57606A]">Origin &amp; Year:</span>
                   <div className="font-semibold text-[#1F2328]">
                     {selectedSampleDetail.country} ({selectedSampleDetail.year})
                   </div>
                 </div>
                 <div>
-                  <span className="text-[#656D76]">MLST:</span>
-                  <div className="font-semibold text-[#1F2328]">{selectedSampleDetail.st}</div>
+                  <span className="text-[#57606A]">Sequence Type (MLST):</span>
+                  <div className="font-semibold font-mono text-[#1F2328]">{selectedSampleDetail.st || 'Pending'}</div>
                 </div>
                 <div>
-                  <span className="text-[#656D76]">N50:</span>
-                  <div className="font-mono text-[#1F2328]">{selectedSampleDetail.n50?.toLocaleString()} bp</div>
+                  <span className="text-[#57606A]">Assembly N50:</span>
+                  <div className="font-mono text-[#1F2328]">
+                    {selectedSampleDetail.n50 ? `${selectedSampleDetail.n50.toLocaleString()} bp` : 'Not assembled'}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[#57606A]">Genome Size / GC:</span>
+                  <div className="font-mono text-[#1F2328]">
+                    {(selectedSampleDetail.genome_size_bp / 1e6).toFixed(2)} Mb ({selectedSampleDetail.gc_percent}% GC)
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[#57606A]">Contig Count:</span>
+                  <div className="font-mono text-[#1F2328]">{selectedSampleDetail.contigs || '—'}</div>
                 </div>
               </div>
+
+              <div className="space-y-1 text-[11px] font-mono bg-[#F6F8FA] p-2.5 rounded-md border border-[#D0D7DE]">
+                <div className="truncate" title={selectedSampleDetail.r1_path}>
+                  <strong className="text-[#57606A]">R1:</strong> {selectedSampleDetail.r1_path || '—'}
+                </div>
+                <div className="truncate" title={selectedSampleDetail.r2_path}>
+                  <strong className="text-[#57606A]">R2:</strong> {selectedSampleDetail.r2_path || '—'}
+                </div>
+                <div className="truncate" title={selectedSampleDetail.assembly_path}>
+                  <strong className="text-[#57606A]">Assembly:</strong> {selectedSampleDetail.assembly_path || '—'}
+                </div>
+              </div>
+
               <div>
-                <span className="font-semibold text-[#1F2328] block mb-1">AMR Genes:</span>
+                <span className="font-semibold text-[#1F2328] block mb-1">Detected AMR Genes &amp; Plasmids:</span>
                 <div className="flex flex-wrap gap-1">
-                  {selectedSampleDetail.amr_genes?.map((g) => (
+                  {selectedSampleDetail.amr_genes?.length ? (
+                    selectedSampleDetail.amr_genes.map((g) => (
+                      <span
+                        key={g}
+                        className="px-2 py-0.5 font-mono text-[11px] bg-[#FFEBE9] text-[#CF222E] border border-[#FF8182]/40 rounded-full"
+                      >
+                        {g}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[#57606A]">No AMR genes profiled yet</span>
+                  )}
+                  {selectedSampleDetail.plasmids?.map((p) => (
                     <span
-                      key={g}
-                      className="px-1.5 py-0.5 font-mono text-[10px] bg-[#FFEBE9] text-[#CF222E] border border-[#FF8182]/40 rounded-full"
+                      key={p}
+                      className="px-2 py-0.5 font-mono text-[11px] bg-[#DDF4FF] text-[#0969DA] border border-[#54AEFF]/40 rounded-full"
                     >
-                      {g}
+                      {p}
                     </span>
                   ))}
                 </div>
               </div>
-              <div className="flex justify-end pt-2 border-t border-[#D0D7DE]">
+              <div className="flex items-center justify-between pt-2 border-t border-[#D0D7DE]">
                 <button onClick={() => setSelectedSampleDetail(null)} className="gh-btn-secondary">
                   Close
+                </button>
+                <button
+                  onClick={() => {
+                    if (!selectedSamples.includes(selectedSampleDetail.id)) {
+                      onToggleSample(selectedSampleDetail.id);
+                    }
+                    setSelectedSampleDetail(null);
+                    onNavigateTab('workbench');
+                  }}
+                  className="gh-btn-execute"
+                >
+                  <span>Run Tools on Sample</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

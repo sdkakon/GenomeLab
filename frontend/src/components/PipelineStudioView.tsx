@@ -34,7 +34,7 @@ export interface PipelineStudioViewProps {
   onChangeOrganism: (org: string) => void;
   activeProject?: Project;
   thermalGuard: ThermalGuardConfig;
-  onInspectToolCode: (tool: ToolDefinition, params: Record<string, any>) => void;
+  onInspectToolCode: (tool: ToolDefinition, params: Record<string, any>, customFlags?: string) => void;
   onRunWorkflow: (
     name: string,
     nodes: PipelineNode[],
@@ -59,64 +59,64 @@ export const PipelineStudioView: React.FC<PipelineStudioViewProps> = ({
   const defaultPresets: PipelinePreset[] = useMemo(
     () => [
       {
-        id: 'preset-salmonella-50wgs',
+        id: 'preset_salmonella_50',
         name: '50-Genome Salmonella WGS Standard',
         subtitle: 'Complete QC, Hybrid Assembly, AMRFinderPlus & Core SNP Phylogeny',
-        description: 'Gold standard surveillance workflow for 50 Salmonella WGS isolates.',
+        description: 'Recommended surveillance workflow for 50 Salmonella WGS isolates.',
         target_organism: 'Salmonella enterica',
         estimated_runtime: '45 mins (WSL2 8-thread)',
         nodes: [
-          { id: 'node-fastp', tool_id: 'fastp', label: 'fastp QC & Trim', stage_id: 1, x: 40, y: 120, parameters: { threads: 8, qualified_quality_phred: 20 } },
-          { id: 'node-unicycler', tool_id: 'unicycler', label: 'Unicycler Assembly', stage_id: 3, x: 300, y: 120, parameters: { threads: 8, mode: 'normal' } },
+          { id: 'node-fastp', tool_id: 'fastp', label: 'fastp QC & Trim', stage_id: 2, x: 40, y: 120, parameters: { threads: 8, qualified_quality_phred: 20 } },
+          { id: 'node-unicycler', tool_id: 'unicycler', label: 'Unicycler Assembly', stage_id: 5, x: 300, y: 120, parameters: { threads: 8, mode: 'normal' } },
           { id: 'node-bakta', tool_id: 'bakta', label: 'Bakta Annotation', stage_id: 7, x: 560, y: 60, parameters: { threads: 8, min_contig_length: 200 } },
           { id: 'node-amrfinder', tool_id: 'amrfinderplus', label: 'AMRFinderPlus', stage_id: 8, x: 560, y: 210, parameters: { organism: 'Salmonella', ident_min: 0.9 } },
-          { id: 'node-roary', tool_id: 'roary', label: 'Roary Pangenome', stage_id: 11, x: 820, y: 60, parameters: { threads: 8, cd: 95 } },
-          { id: 'node-iqtree', tool_id: 'iqtree2', label: 'IQ-TREE 2 ML Phylogeny', stage_id: 12, x: 1080, y: 60, parameters: { threads: 8, m: 'GTR+F+R4' } },
+          { id: 'node-roary', tool_id: 'roary', label: 'Roary Pangenome', stage_id: 10, x: 820, y: 60, parameters: { threads: 8, cd: 95 } },
+          { id: 'node-iqtree', tool_id: 'iqtree2', label: 'IQ-TREE 2 ML Phylogeny', stage_id: 11, x: 1080, y: 60, parameters: { threads: 8, m: 'GTR+F+R4' } },
         ],
         edges: [
-          { id: 'e1', source: 'node-fastp', target: 'node-unicycler', data_format: 'FASTQ_PE' },
-          { id: 'e2', source: 'node-unicycler', target: 'node-bakta', data_format: 'FASTA_CONTIGS' },
-          { id: 'e3', source: 'node-unicycler', target: 'node-amrfinder', data_format: 'FASTA_CONTIGS' },
+          { id: 'e1', source: 'node-fastp', target: 'node-unicycler', data_format: 'FASTQ.GZ' },
+          { id: 'e2', source: 'node-unicycler', target: 'node-bakta', data_format: 'FASTA' },
+          { id: 'e3', source: 'node-unicycler', target: 'node-amrfinder', data_format: 'FASTA' },
           { id: 'e4', source: 'node-bakta', target: 'node-roary', data_format: 'GFF3' },
-          { id: 'e5', source: 'node-roary', target: 'node-iqtree', data_format: 'CORE_ALN_FASTA' },
+          { id: 'e5', source: 'node-roary', target: 'node-iqtree', data_format: 'ALN.FASTA' },
         ],
       },
       {
-        id: 'preset-ecoli-variant',
+        id: 'preset_ecoli_ref',
         name: 'E. coli Reference Variant Pipeline',
         subtitle: 'BWA-MEM2, GATK4 HaplotypeCaller & SnpEff',
         description: 'Precision mapping and variant calling against E. coli K-12 / O157:H7.',
         target_organism: 'Escherichia coli',
         estimated_runtime: '30 mins (WSL2)',
         nodes: [
-          { id: 'node-fastp-ec', tool_id: 'fastp', label: 'fastp Clean', stage_id: 1, x: 40, y: 120, parameters: { threads: 8 } },
-          { id: 'node-bwa', tool_id: 'bwa-mem2', label: 'BWA-MEM2 Align', stage_id: 4, x: 300, y: 120, parameters: { threads: 8 } },
-          { id: 'node-gatk', tool_id: 'gatk4-haplotypecaller', label: 'GATK4 HaplotypeCaller', stage_id: 5, x: 560, y: 120, parameters: { ploidy: 1 } },
-          { id: 'node-snpeff', tool_id: 'snpeff', label: 'SnpEff Annotation', stage_id: 5, x: 820, y: 120, parameters: {} },
+          { id: 'node-fastp-ec', tool_id: 'fastp', label: 'fastp Clean', stage_id: 2, x: 40, y: 120, parameters: { threads: 8 } },
+          { id: 'node-bwa', tool_id: 'bwa_mem', label: 'BWA-MEM2 Align', stage_id: 3, x: 300, y: 120, parameters: { threads: 8 } },
+          { id: 'node-gatk', tool_id: 'gatk_haplotypecaller', label: 'GATK4 HaplotypeCaller', stage_id: 4, x: 560, y: 120, parameters: { ploidy: 1 } },
+          { id: 'node-snpeff', tool_id: 'snpeff', label: 'SnpEff Annotation', stage_id: 4, x: 820, y: 120, parameters: {} },
         ],
         edges: [
-          { id: 'e1', source: 'node-fastp-ec', target: 'node-bwa', data_format: 'FASTQ_PE' },
-          { id: 'e2', source: 'node-bwa', target: 'node-gatk', data_format: 'BAM_SORTED' },
-          { id: 'e3', source: 'node-gatk', target: 'node-snpeff', data_format: 'VCF_GZ' },
+          { id: 'e1', source: 'node-fastp-ec', target: 'node-bwa', data_format: 'FASTQ.GZ' },
+          { id: 'e2', source: 'node-bwa', target: 'node-gatk', data_format: 'BAM' },
+          { id: 'e3', source: 'node-gatk', target: 'node-snpeff', data_format: 'VCF.GZ' },
         ],
       },
       {
-        id: 'preset-rapid-amr',
+        id: 'preset_amr_triage',
         name: 'Rapid Clinical AMR Triage',
         subtitle: 'Sub-15min K-mer Direct Screening',
         description: 'Rapid resistance profiling directly from FASTQ and contigs.',
         target_organism: 'Klebsiella pneumoniae',
         estimated_runtime: '12 mins',
         nodes: [
-          { id: 'node-fastp-amr', tool_id: 'fastp', label: 'fastp Filter', stage_id: 1, x: 40, y: 120, parameters: {} },
-          { id: 'node-spades', tool_id: 'spades', label: 'SPAdes Assembler', stage_id: 3, x: 300, y: 120, parameters: {} },
+          { id: 'node-fastp-amr', tool_id: 'fastp', label: 'fastp Filter', stage_id: 2, x: 40, y: 120, parameters: {} },
+          { id: 'node-spades', tool_id: 'spades', label: 'SPAdes Assembler', stage_id: 5, x: 300, y: 120, parameters: {} },
           { id: 'node-abricate', tool_id: 'abricate', label: 'ABRicate ResFinder', stage_id: 8, x: 560, y: 60, parameters: { db: 'resfinder' } },
           { id: 'node-amrfinder2', tool_id: 'amrfinderplus', label: 'AMRFinderPlus', stage_id: 8, x: 560, y: 210, parameters: {} },
         ],
         edges: [
-          { id: 'e1', source: 'node-fastp-amr', target: 'node-spades', data_format: 'FASTQ_PE' },
-          { id: 'e2', source: 'node-spades', target: 'node-abricate', data_format: 'FASTA_CONTIGS' },
-          { id: 'e3', source: 'node-spades', target: 'node-amrfinder2', data_format: 'FASTA_CONTIGS' },
+          { id: 'e1', source: 'node-fastp-amr', target: 'node-spades', data_format: 'FASTQ.GZ' },
+          { id: 'e2', source: 'node-spades', target: 'node-abricate', data_format: 'FASTA' },
+          { id: 'e3', source: 'node-spades', target: 'node-amrfinder2', data_format: 'FASTA' },
         ],
       },
     ],
@@ -240,16 +240,24 @@ export const PipelineStudioView: React.FC<PipelineStudioViewProps> = ({
     } else if (type === 'target' && connectingSourceId) {
       if (connectingSourceId !== nodeId) {
         const sourceNode = nodes.find((n) => n.id === connectingSourceId);
+        const srcTool = sourceNode ? toolMap.get(sourceNode.tool_id) : null;
         const formatBadge =
-          sourceNode?.stage_id === 1
-            ? 'FASTQ_PE'
-            : sourceNode?.stage_id === 3
-            ? 'FASTA_CONTIGS'
+          srcTool?.output_formats?.[0]?.toUpperCase() ||
+          (sourceNode?.stage_id === 1 || sourceNode?.stage_id === 2
+            ? 'FASTQ.GZ'
+            : sourceNode?.stage_id === 3 || sourceNode?.stage_id === 4
+            ? 'BAM'
+            : sourceNode?.stage_id === 5 || sourceNode?.stage_id === 6
+            ? 'FASTA'
             : sourceNode?.stage_id === 7
             ? 'GFF3'
             : sourceNode?.stage_id === 8
             ? 'AMR_TSV'
-            : 'DATA_STREAM';
+            : sourceNode?.stage_id === 9
+            ? 'VCF.GZ'
+            : sourceNode?.stage_id === 10 || sourceNode?.stage_id === 11
+            ? 'ALN.FASTA'
+            : 'REPORTS');
 
         const newEdge: PipelineEdge = {
           id: `edge-${Date.now().toString().slice(-5)}`,
@@ -400,10 +408,10 @@ ${nodes
           <button
             onClick={handleAutoBuildGoldStandard}
             className="gh-btn-secondary"
-            title="Reset to gold-standard pipeline for current organism"
+            title="Restore default recommended pipeline for current organism"
           >
             <Star className="w-3.5 h-3.5 fill-[#D97706] text-[#D97706]" />
-            <span>Reset Gold-Standard</span>
+            <span>Restore Default</span>
           </button>
 
           <span className="gh-badge font-mono">
@@ -415,7 +423,7 @@ ${nodes
         <div className="flex items-center gap-1.5 flex-wrap">
           <button onClick={() => setShowScriptModal(true)} className="gh-btn-secondary">
             <Code2 className="w-3.5 h-3.5 text-[#656D76]" />
-            <span>Export .sh / .nf</span>
+            <span>Export Scripts (.sh / .nf)</span>
           </button>
 
           <button
@@ -424,16 +432,16 @@ ${nodes
               setEdges([]);
               setSelectedNodeId(null);
             }}
-            className="gh-btn-secondary"
-            title="Clear DAG Canvas"
+            className="gh-btn-danger"
+            title="Clear workflow canvas"
           >
-            <Trash2 className="w-3.5 h-3.5 text-[#656D76]" />
-            <span>Clear</span>
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Clear Canvas</span>
           </button>
 
           <button
             onClick={() => setShowRunModal(true)}
-            className="gh-btn-primary flex items-center gap-1.5"
+            className="gh-btn-execute flex items-center gap-1.5"
           >
             <ProcessStatusDot
               status={processState?.status || 'idle'}
@@ -444,7 +452,7 @@ ${nodes
               {processState?.status === 'running'
                 ? 'Running Workflow...'
                 : processState?.status === 'completed'
-                ? 'Run Workflow Again'
+                ? 'Re-run Workflow'
                 : 'Run Workflow'}
             </span>
           </button>
@@ -564,8 +572,8 @@ ${nodes
                           e.stopPropagation();
                           handleDeleteEdge(edge.id);
                         }}
-                        className="bg-white border border-[#D0D7DE] text-[#24292F] group-hover:border-[#CF222E] group-hover:text-[#CF222E] px-1.5 py-0.5 rounded text-[9px] font-mono cursor-pointer flex items-center gap-1"
-                        title="Click to remove edge"
+                        className="bg-white border border-[#D0D7DE] text-[#24292F] group-hover:border-[#CF222E] group-hover:text-[#CF222E] px-1.5 py-0.5 rounded text-[11px] font-mono cursor-pointer flex items-center gap-1 shadow-2xs"
+                        title="Click to remove connection"
                       >
                         {edge.data_format}
                         <X className="w-2.5 h-2.5 hidden group-hover:inline" />
@@ -586,7 +594,7 @@ ${nodes
               <div
                 key={node.id}
                 style={{ transform: `translate3d(${node.x}px, ${node.y}px, 0)` }}
-                className={`absolute w-54 bg-white rounded-md border transition-shadow cursor-move z-10 ${
+                className={`absolute w-[216px] bg-white rounded-md border transition-shadow cursor-move z-10 ${
                   isSelected
                     ? 'border-[#0969DA] ring-2 ring-[#0969DA]/20 shadow-md'
                     : 'border-[#D0D7DE] hover:border-[#8C959F] shadow-2xs'
@@ -651,7 +659,7 @@ ${nodes
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (tool) onInspectToolCode(tool, node.parameters);
+                      if (tool) onInspectToolCode(tool, node.parameters, node.custom_flags);
                     }}
                     className="text-[10px] text-[#0969DA] hover:underline font-medium cursor-pointer"
                   >
@@ -811,7 +819,12 @@ ${nodes
               <div className="pt-2 border-t border-[#D0D7DE]">
                 <button
                   onClick={() => {
-                    if (selectedToolDef) onInspectToolCode(selectedToolDef, selectedNode.parameters);
+                    if (selectedToolDef)
+                      onInspectToolCode(
+                        selectedToolDef,
+                        selectedNode.parameters,
+                        selectedNode.custom_flags
+                      );
                   }}
                   className="gh-btn-secondary w-full"
                 >
@@ -932,8 +945,8 @@ ${nodes
 
               <div className="bg-[#F6F8FA] border border-[#D0D7DE] rounded-md p-3 space-y-1 text-[#656D76]">
                 <div className="flex justify-between">
-                  <span>Active Nodes:</span>
-                  <span className="font-semibold text-[#1F2328]">{nodes.length} Stages</span>
+                  <span>Workflow Steps:</span>
+                  <span className="font-semibold text-[#1F2328]">{nodes.length} steps</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Hardware Cap:</span>
@@ -949,20 +962,20 @@ ${nodes
                     onRunWorkflow(workflowName, nodes, edges, 'wsl_real');
                     setShowRunModal(false);
                   }}
-                  className="gh-btn-primary w-full py-1.5"
+                  className="gh-btn-execute w-full py-1.5 flex items-center justify-center gap-1.5"
                 >
                   <Play className="w-3.5 h-3.5" />
-                  <span>Execute in WSL2 Ubuntu</span>
+                  <span>Run Locally in WSL2</span>
                 </button>
                 <button
                   onClick={() => {
                     onRunWorkflow(workflowName, nodes, edges, 'fast_simulation');
                     setShowRunModal(false);
                   }}
-                  className="gh-btn-secondary w-full py-1.5"
+                  className="gh-btn-secondary w-full py-1.5 flex items-center justify-center gap-1.5"
                 >
                   <Zap className="w-3.5 h-3.5 text-[#D97706]" />
-                  <span>Fast Simulation Run</span>
+                  <span>Run Simulated Dry Run</span>
                 </button>
               </div>
             </div>

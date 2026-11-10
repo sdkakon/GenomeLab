@@ -26,6 +26,7 @@ interface EnvironmentCenterViewProps {
   onRunSetupAction: (action: string) => void;
   setupLogs: string[];
   isSettingUp: boolean;
+  engineStatus?: 'connected' | 'sandbox';
 }
 
 type SettingsSection = 'wsl_bridge' | 'conda_envs' | 'tool_matrix' | 'setup_wizard' | 'methods';
@@ -38,6 +39,7 @@ export default function EnvironmentCenterView({
   onRunSetupAction,
   setupLogs,
   isSettingUp,
+  engineStatus = 'connected',
 }: EnvironmentCenterViewProps) {
   const [activeSection, setActiveSection] = useState<SettingsSection>('wsl_bridge');
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,7 +48,7 @@ export default function EnvironmentCenterView({
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
 
   const [newFolderPath, setNewFolderPath] = useState(
-    activeProject?.wsl_path || '/home/soumandeykakon/GenomeLab_Workspaces/New_Project'
+    activeProject?.wsl_path || '~/GenomeLab_Workspaces/New_Project'
   );
   const [createSubfolders, setCreateSubfolders] = useState(true);
   const [folderResult, setFolderResult] = useState<{
@@ -150,13 +152,19 @@ Raw paired-end sequencing reads were retrieved via NCBI SRA Toolkit (fasterq-dum
           </div>
         </div>
 
-        {/* WSL2 Connection Summary Box */}
+        {/* Execution Engine Status Box */}
         <div className="gh-box p-3 space-y-2 text-xs bg-white">
           <div className="flex items-center justify-between">
-            <span className="font-semibold text-[#1F2328]">WSL2 Status</span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#DAFBE1] text-[#1A7F37]">
-              <CheckCircle2 className="w-3 h-3" /> Connected
-            </span>
+            <span className="font-semibold text-[#1F2328]">Engine</span>
+            {engineStatus === 'connected' ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#DAFBE1] text-[#1A7F37]">
+                <CheckCircle2 className="w-3 h-3" /> Connected (WSL2)
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#FFF8C5] text-[#9A6700] border border-[#D4A72C]/30">
+                <Activity className="w-3 h-3" /> Demo Mode
+              </span>
+            )}
           </div>
           <div className="text-[11px] text-[#656D76] space-y-1 font-mono">
             <div>Distro: {wslStatus.distro}</div>
@@ -319,7 +327,7 @@ Raw paired-end sequencing reads were retrieved via NCBI SRA Toolkit (fasterq-dum
                       label: 'SPAdes & Prokka',
                       cmd: 'spades.py --version && prokka --version && abricate --version',
                     },
-                    { label: 'List Home', cmd: 'ls -la /home/soumandeykakon' },
+                    { label: 'List Home (~)', cmd: 'ls -la ~' },
                     { label: 'Conda Envs', cmd: 'conda info --envs' },
                   ].map((preset) => (
                     <button
@@ -381,7 +389,7 @@ Raw paired-end sequencing reads were retrieved via NCBI SRA Toolkit (fasterq-dum
                   className={onlyGoldStandard ? 'gh-btn-primary' : 'gh-btn-secondary'}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Gold Standard</span>
+                  <span>Recommended Tools</span>
                 </button>
               </div>
             </div>
@@ -412,7 +420,7 @@ Raw paired-end sequencing reads were retrieved via NCBI SRA Toolkit (fasterq-dum
                         <td className="py-2 px-3">
                           <span className="font-semibold text-[#1F2328]">{tool.name}</span>
                           {tool.is_gold_standard && (
-                            <span className="ml-1.5 gh-badge text-[10px] py-0">★ Gold</span>
+                            <span className="ml-1.5 gh-badge bg-[#FFF8C5] text-[#9A6700] border-[#D4A72C]/40 text-[10px] py-0">Recommended</span>
                           )}
                         </td>
                         <td className="py-2 px-3 font-mono text-[#1F2328]">
@@ -428,7 +436,7 @@ Raw paired-end sequencing reads were retrieved via NCBI SRA Toolkit (fasterq-dum
                               <CheckCircle2 className="w-3 h-3" /> Installed
                             </span>
                           ) : (
-                            <span className="gh-badge text-[10px]">Ready</span>
+                            <span className="gh-badge bg-[#FFF8C5] text-[#9A6700] border-[#D4A72C]/40 text-[10px]">Not Installed</span>
                           )}
                         </td>
                         <td className="py-2 px-3 text-right">
@@ -443,7 +451,7 @@ Raw paired-end sequencing reads were retrieved via NCBI SRA Toolkit (fasterq-dum
                               ) : (
                                 <Copy className="w-3 h-3" />
                               )}
-                              <span>CLI</span>
+                              <span>Copy Cmd</span>
                             </button>
                             <button
                               onClick={() => onInstallTool(tool)}

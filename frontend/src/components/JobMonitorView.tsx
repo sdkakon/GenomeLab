@@ -14,6 +14,8 @@ import {
   XCircle,
   Activity,
   Terminal,
+  ArrowRight,
+  FileCheck2,
 } from 'lucide-react';
 
 export interface JobMonitorViewProps {
@@ -23,6 +25,8 @@ export interface JobMonitorViewProps {
   onUpdateThermalGuard: (tg: ThermalGuardConfig) => void;
   onInspectJobCode: (job: JobRecord) => void;
   onCancelJob: (jobId: string) => void;
+  onNavigateTab?: (tab: string) => void;
+  onJumpToStage?: (stageId: number) => void;
 }
 
 export const JobMonitorView: React.FC<JobMonitorViewProps> = ({
@@ -32,6 +36,8 @@ export const JobMonitorView: React.FC<JobMonitorViewProps> = ({
   onUpdateThermalGuard,
   onInspectJobCode,
   onCancelJob,
+  onNavigateTab,
+  onJumpToStage,
 }) => {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(
     jobs.length > 0 ? jobs[0].id : null
@@ -166,7 +172,7 @@ export const JobMonitorView: React.FC<JobMonitorViewProps> = ({
               }`}
               title="Toggle Project Scoped Runs vs All Projects"
             >
-              <span>{filterByProject ? `Project: ${activeProject.name.slice(0, 18)}...` : 'Show All Projects'}</span>
+              <span>{filterByProject ? `Scope: ${activeProject.name}` : 'Scope: All Projects'}</span>
             </button>
           )}
         </div>
@@ -244,7 +250,7 @@ export const JobMonitorView: React.FC<JobMonitorViewProps> = ({
             }
             className={thermalGuard.enabled ? 'gh-btn-primary' : 'gh-btn-secondary'}
           >
-            {thermalGuard.enabled ? 'Guard: ON' : 'Guard: OFF'}
+            {thermalGuard.enabled ? 'Thermal Cooldown: Active' : 'Thermal Cooldown: Off'}
           </button>
         </div>
       </div>
@@ -311,10 +317,10 @@ export const JobMonitorView: React.FC<JobMonitorViewProps> = ({
                             onInspectJobCode(job);
                           }}
                           className="gh-btn-secondary py-0.5 px-2 text-[11px]"
-                          title="Inspect Executed CLI & Beginner Guide"
+                          title="Inspect Executed CLI & Parameter Reference"
                         >
                           <Code2 className="w-3 h-3" />
-                          <span>CLI</span>
+                          <span>Inspect CLI</span>
                         </button>
                         {(job.status === 'running' ||
                           job.status === 'queued' ||
@@ -324,9 +330,10 @@ export const JobMonitorView: React.FC<JobMonitorViewProps> = ({
                               e.stopPropagation();
                               onCancelJob(job.id);
                             }}
-                            className="px-2 py-0.5 text-[11px] font-medium text-[#CF222E] hover:bg-[#FFEBE9] rounded-md border border-[#FF8182]/40 cursor-pointer"
+                            className="gh-btn-danger text-[11px] py-0.5 px-2"
+                            title="Terminate currently executing background process"
                           >
-                            Cancel
+                            Terminate Job
                           </button>
                         )}
                       </div>
@@ -404,7 +411,7 @@ export const JobMonitorView: React.FC<JobMonitorViewProps> = ({
                     : 'bg-[#21262D] border-[#30363D] text-[#8B949E]'
                 }`}
               >
-                Follow: {autoScroll ? 'ON' : 'OFF'}
+                Auto-scroll: {autoScroll ? 'ON' : 'OFF'}
               </button>
 
               <button
@@ -427,17 +434,17 @@ export const JobMonitorView: React.FC<JobMonitorViewProps> = ({
               <div className="truncate text-[#8B949E]">
                 <span className="text-[#3FB950] font-bold">$ </span>
                 <span className="text-[#E6EDF3]">
-                  wsl.exe -d Ubuntu -e bash -c &quot;conda run -n{' '}
-                  {selectedJob.code_inspection?.conda_env || 'wgs_env'}{' '}
-                  {selectedJob.tool_name}&quot;
+                  wsl.exe -d Ubuntu -e bash -c &quot;
+                  {selectedJob.code_inspection?.single_sample_command ||
+                    selectedJob.command ||
+                    `conda run -n ${selectedJob.code_inspection?.conda_env || 'wgs_env'} ${selectedJob.tool_name.toLowerCase()}`}
+                  &quot;
                 </span>
               </div>
               <button
                 onClick={() =>
                   copyExecutionCommand(
-                    `wsl.exe -d Ubuntu -e bash -c "conda run -n ${
-                      selectedJob.code_inspection?.conda_env || 'wgs_env'
-                    } ${selectedJob.tool_name}"`
+                    `wsl.exe -d Ubuntu -e bash -c "${selectedJob.code_inspection?.single_sample_command || selectedJob.command || `conda run -n ${selectedJob.code_inspection?.conda_env || 'wgs_env'} ${selectedJob.tool_name.toLowerCase()}`}"`
                   )
                 }
                 className="text-[#8B949E] hover:text-white p-0.5 rounded shrink-0 cursor-pointer"
@@ -479,7 +486,7 @@ export const JobMonitorView: React.FC<JobMonitorViewProps> = ({
                         : 'text-[#E6EDF3]'
                     }`}
                   >
-                    <span className="text-[#484F58] select-none w-8 shrink-0 text-right pr-3">
+                    <span className="text-[#8B949E] select-none w-8 shrink-0 text-right pr-3 font-semibold">
                       {index + 1}
                     </span>
                     <span className="flex-1">{log}</span>
@@ -489,6 +496,50 @@ export const JobMonitorView: React.FC<JobMonitorViewProps> = ({
             )}
             <div ref={terminalEndRef} />
           </div>
+
+          {/* Verified Output Artifacts & Logical Next Step Banner */}
+          {selectedJob && selectedJob.status === 'completed' && (
+            <div className="bg-[#161B22] border-t border-[#30363D] p-3 shrink-0 flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 text-xs text-[#3FB950] font-medium">
+                  <FileCheck2 className="w-4 h-4 shrink-0" />
+                  <span>Output Files Verified on Disk ({selectedJob.output_files?.length || 1} file(s))</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {onJumpToStage && (
+                    <button
+                      onClick={() => onJumpToStage((selectedJob.stage_id || 1) + 1)}
+                      className="gh-btn-secondary py-1 px-2.5 text-xs font-semibold text-[#3FB950] border-[#238636] bg-[#21262D] hover:bg-[#30363D] flex items-center gap-1"
+                    >
+                      <span>Continue to Next Stage in Tools</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {onNavigateTab && (
+                    <button
+                      onClick={() => onNavigateTab('visualizer')}
+                      className="gh-btn-secondary py-1 px-2.5 text-xs text-[#58A6FF] border-[#388BFD]/40 bg-[#21262D] hover:bg-[#30363D] flex items-center gap-1"
+                    >
+                      <span>View in Results & Figures</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              {selectedJob.output_files && selectedJob.output_files.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedJob.output_files.map((file, i) => (
+                    <span
+                      key={i}
+                      className="text-[11px] font-mono bg-[#0D1117] text-[#8B949E] px-2 py-0.5 rounded border border-[#30363D]"
+                    >
+                      {file}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

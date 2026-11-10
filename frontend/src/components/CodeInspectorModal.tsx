@@ -36,6 +36,14 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showWslWrapper, setShowWslWrapper] = useState(false);
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !inspection) return null;
 
   const handleCopy = (text: string, key: string) => {
@@ -127,7 +135,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({
             }`}
           >
             <Terminal className="w-4 h-4 text-zinc-700" />
-            1. Exact CLI & Flag-by-Flag Guide
+            1. Single-Sample CLI & Flag Reference
           </button>
 
           <button
@@ -163,7 +171,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({
             }`}
           >
             <BookOpen className="w-4 h-4 text-zinc-700" />
-            4. Conda YAML & Beginner Tips
+            4. Conda YAML & Best Practices
           </button>
         </div>
 
@@ -255,7 +263,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-zinc-900" />
                     <h3 className="text-sm font-bold text-zinc-900">
-                      Beginner Flag-by-Flag Anatomy & Scientific Rationale
+                      Parameter & Flag Reference
                     </h3>
                   </div>
                   <span className="text-xs text-zinc-500">
@@ -501,7 +509,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({
                   </div>
                 </div>
 
-                {/* Beginner Tips & Best Practices */}
+                {/* Best Practices & Guidelines */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />

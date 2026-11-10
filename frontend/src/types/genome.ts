@@ -125,6 +125,8 @@ export interface JobRecord {
   tool_id: string;
   tool_name: string;
   stage_name: string;
+  stage_id?: number;
+  command?: string;
   execution_mode: 'wsl_real' | 'fast_simulation';
   status: JobStatus;
   progress: number;

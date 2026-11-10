@@ -79,13 +79,13 @@ export const ProjectsHomeView: React.FC<ProjectsHomeViewProps> = ({
   const [organismFilter, setOrganismFilter] = useState('ALL');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const [newProjectName, setNewProjectName] = useState('Helicobacter_pylori_Cohort');
+  const [newProjectName, setNewProjectName] = useState('');
   const [newOrganism, setNewOrganism] = useState('bacteria');
-  const [newSpeciesLabel, setNewSpeciesLabel] = useState('Helicobacter pylori');
-  const [newWslPath, setNewWslPath] = useState(
-    '/home/soumandeykakon/GenomeLab_Workspaces/Helicobacter_pylori_Cohort'
-  );
-  const [newSampleIds, setNewSampleIds] = useState('SRR40271360, SRR40271362');
+  const [newSpeciesLabel, setNewSpeciesLabel] = useState('');
+  const [newStrainSubtype, setNewStrainSubtype] = useState('');
+  const [newWslPath, setNewWslPath] = useState('');
+  const [newSampleIds, setNewSampleIds] = useState('');
+  const [isProjectNameCustom, setIsProjectNameCustom] = useState(false);
 
   const uniqueOrganisms = useMemo(() => {
     const set = new Set<string>();
@@ -110,44 +110,78 @@ export const ProjectsHomeView: React.FC<ProjectsHomeViewProps> = ({
   }, [projects, searchQuery, organismFilter]);
 
   const currentPresetMatch = useMemo(() => {
+    const q = newSpeciesLabel.toLowerCase().trim();
+    if (!q) return null;
     return UNIVERSAL_ORGANISM_PRESETS.find(
       (p) =>
-        p.species.toLowerCase() === newSpeciesLabel.toLowerCase() ||
-        newSpeciesLabel.toLowerCase().includes(p.species.toLowerCase())
+        p.species.toLowerCase() === q ||
+        p.label.toLowerCase() === q ||
+        q.includes(p.species.toLowerCase()) ||
+        q.includes(p.label.toLowerCase())
     );
   }, [newSpeciesLabel]);
 
-  const handleSelectOrganismPreset = (p: OrganismPreset) => {
-    setNewOrganism(p.kingdom);
-    setNewSpeciesLabel(p.species);
-    const cleanName = `${p.species.replace(/[\s\(\)\/]+/g, '_')}_Analysis`;
-    setNewProjectName(cleanName);
-    setNewWslPath(`/home/soumandeykakon/GenomeLab_Workspaces/${cleanName}`);
+  const handleSpeciesChange = (val: string) => {
+    setNewSpeciesLabel(val);
+    const cleanName = val.trim().replace(/[\s\(\)\/]+/g, '_');
+    if (!isProjectNameCustom) {
+      if (cleanName) {
+        setNewProjectName(`${cleanName}_Cohort`);
+        setNewWslPath(`~/GenomeLab_Workspaces/${cleanName}_Cohort`);
+      } else {
+        setNewProjectName('');
+        setNewWslPath('');
+      }
+    }
+    const match = UNIVERSAL_ORGANISM_PRESETS.find(
+      (p) =>
+        p.species.toLowerCase() === val.toLowerCase().trim() ||
+        p.label.toLowerCase() === val.toLowerCase().trim() ||
+        val.toLowerCase().includes(p.label.toLowerCase()) ||
+        val.toLowerCase().includes(p.species.toLowerCase())
+    );
+    if (match) {
+      setNewOrganism(match.kingdom);
+    }
+  };
+
+  const handleOpenCreateModal = () => {
+    setNewProjectName('');
+    setNewOrganism('bacteria');
+    setNewSpeciesLabel('');
+    setNewStrainSubtype('');
+    setNewWslPath('');
+    setNewSampleIds('');
+    setIsProjectNameCustom(false);
+    setShowCreateModal(true);
   };
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProjectName.trim()) return;
+    const finalSpecies = newStrainSubtype.trim()
+      ? `${newSpeciesLabel.trim()} (${newStrainSubtype.trim()})`
+      : newSpeciesLabel.trim();
     onCreateProject(
       newProjectName.trim(),
       newOrganism,
-      newWslPath.trim(),
+      newWslPath.trim() || `~/GenomeLab_Workspaces/${newProjectName.trim()}`,
       newSampleIds.trim(),
-      newSpeciesLabel.trim()
+      finalSpecies || newSpeciesLabel.trim()
     );
     setShowCreateModal(false);
   };
 
   return (
     <div className="h-full w-full max-w-5xl mx-auto flex flex-col min-h-0 overflow-hidden gap-3 py-1">
-      {/* Top GitHub Repositories Filter & New Project Bar */}
+      {/* Top Projects Filter & Action Bar */}
       <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-2 flex-1 min-w-[240px]">
           <div className="relative flex-1 max-w-md">
-            <Search className="w-3.5 h-3.5 text-[#656D76] absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-[#57606A] absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Find a project..."
+              placeholder="Search projects by name, organism, or path..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="gh-input w-full pl-8 py-1.5"
@@ -170,30 +204,18 @@ export const ProjectsHomeView: React.FC<ProjectsHomeViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {onOpenWindowsSetup && (
+          {onLoadDemoProjects && (
             <button
-              onClick={onOpenWindowsSetup}
-              className="gh-btn-secondary py-1.5 px-3 border-[#0969DA]/40 text-[#0969DA] hover:bg-[#0969DA]/10 cursor-pointer"
-              title="Automated 1-click installer for Windows: installs WSL2, Miniforge3 & wgs_env"
-            >
-              <Laptop className="w-3.5 h-3.5" />
-              <span>1-Click Windows Setup</span>
-            </button>
-          )}
-
-          {onOpenUserGuide && (
-            <button
-              onClick={onOpenUserGuide}
+              onClick={onLoadDemoProjects}
               className="gh-btn-secondary py-1.5 px-3 cursor-pointer"
-              title="Open Complete User Guide & Printable PDF Manual"
+              title="Load sample Salmonella & E. coli reference datasets"
             >
-              <FileText className="w-3.5 h-3.5 text-[#656D76]" />
-              <span>PDF Guide</span>
+              <span>Load Demo Datasets</span>
             </button>
           )}
 
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={handleOpenCreateModal}
             className="gh-btn-primary py-1.5 px-3 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -202,19 +224,19 @@ export const ProjectsHomeView: React.FC<ProjectsHomeViewProps> = ({
         </div>
       </div>
 
-      {/* 1-Click Windows Setup Quick Banner */}
+      {/* Windows WSL2 Local Engine Setup Banner */}
       <div className="bg-[#F6F8FA] border border-[#D0D7DE] rounded-md px-3.5 py-2 flex items-center justify-between gap-3 text-xs shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="p-1 bg-[#0969DA]/10 text-[#0969DA] rounded-md shrink-0">
             <Laptop className="w-3.5 h-3.5" />
           </div>
           <div className="min-w-0">
-            <span className="font-semibold text-[#1F2328]">Windows PC Setup: </span>
-            <span className="text-[#656D76] hidden md:inline">
-              Running only Windows? Run our 1-click installer to configure WSL2 Ubuntu, Miniforge3 &amp; the <code>wgs_env</code> suite.
+            <span className="font-semibold text-[#1F2328]">Local Windows Engine Setup: </span>
+            <span className="text-[#57606A] hidden md:inline">
+              Configure WSL2 Ubuntu, Miniforge3 &amp; the <code>wgs_env</code> bioinformatics environment to execute analyses locally on your machine.
             </span>
-            <span className="text-[#656D76] md:hidden">
-              Install WSL2, Miniforge3 &amp; wgs_env with 1 click.
+            <span className="text-[#57606A] md:hidden">
+              Install WSL2 Ubuntu, Miniforge3 &amp; wgs_env locally.
             </span>
           </div>
         </div>
@@ -222,9 +244,9 @@ export const ProjectsHomeView: React.FC<ProjectsHomeViewProps> = ({
           {onOpenWindowsSetup && (
             <button
               onClick={onOpenWindowsSetup}
-              className="gh-btn-primary py-1 px-2.5 text-xs font-medium cursor-pointer"
+              className="gh-btn-secondary py-1 px-2.5 text-xs font-medium border-[#0969DA]/40 text-[#0969DA] hover:bg-[#0969DA]/10 cursor-pointer"
             >
-              <span>Setup Windows</span>
+              <span>Configure Windows Engine</span>
             </button>
           )}
           {onOpenUserGuide && (
@@ -232,8 +254,8 @@ export const ProjectsHomeView: React.FC<ProjectsHomeViewProps> = ({
               onClick={onOpenUserGuide}
               className="gh-btn-secondary py-1 px-2.5 text-xs font-medium cursor-pointer"
             >
-              <FileText className="w-3 h-3 text-[#656D76]" />
-              <span>Manual</span>
+              <FileText className="w-3 h-3 text-[#57606A]" />
+              <span>Open User Guide</span>
             </button>
           )}
         </div>
@@ -329,7 +351,7 @@ export const ProjectsHomeView: React.FC<ProjectsHomeViewProps> = ({
               <div className="flex items-center justify-center gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(true)}
+                  onClick={handleOpenCreateModal}
                   className="gh-btn-primary"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -350,63 +372,67 @@ export const ProjectsHomeView: React.FC<ProjectsHomeViewProps> = ({
         </div>
       </div>
 
-      {/* New Project Wizard Modal with Universal Organism Scope */}
+      {/* New Project Wizard Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Create New Project"
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+        >
           <div className="gh-box max-w-xl w-full shadow-xl">
             <div className="gh-box-header">
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-[#0969DA]" />
                 <h3 className="font-semibold text-[#1F2328] text-xs">
-                  Create a New Universal Bioinformatics Project
+                  Create New Bioinformatics Project
                 </h3>
               </div>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="text-[#656D76] hover:text-[#1F2328]"
+                aria-label="Close modal"
+                className="text-[#57606A] hover:text-[#1F2328]"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
             <form onSubmit={handleCreateSubmit} className="p-4 space-y-3.5 text-xs bg-white">
-              {/* Quick Organism Presets Bar */}
+              {/* Target Organism Name Blank Input - Pure text box, no dropdowns */}
               <div>
                 <label className="block font-semibold text-[#1F2328] mb-1">
-                  Quick Select Organism Preset (Any Kingdom)
+                  Target Organism / Species Name
                 </label>
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto p-1.5 bg-[#F6F8FA] border border-[#D0D7DE] rounded-md">
-                  {UNIVERSAL_ORGANISM_PRESETS.map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => handleSelectOrganismPreset(preset)}
-                      className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer border ${
-                        newSpeciesLabel.toLowerCase().includes(preset.species.toLowerCase())
-                          ? 'bg-[#0969DA] text-white border-[#0969DA]'
-                          : 'bg-white text-[#24292F] border-[#D0D7DE] hover:bg-[#F3F4F6]'
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
+                <input
+                  type="text"
+                  value={newSpeciesLabel}
+                  onChange={(e) => handleSpeciesChange(e.target.value)}
+                  placeholder="Type your chosen organism name (e.g. Salmonella enterica, Escherichia coli, Klebsiella pneumoniae...)"
+                  className="gh-input w-full font-medium"
+                  required
+                  autoFocus
+                />
+                <p className="text-[11px] text-[#656D76] mt-1">
+                  Write any bacterial, viral, fungal, plant, animal, or metagenomic organism name.
+                </p>
               </div>
 
               <div>
                 <label className="block font-semibold text-[#1F2328] mb-1">
-                  Project / Repository Name
+                  Project Name
                 </label>
                 <input
                   type="text"
                   value={newProjectName}
                   onChange={(e) => {
                     setNewProjectName(e.target.value);
+                    setIsProjectNameCustom(true);
                     setNewWslPath(
-                      `/home/soumandeykakon/GenomeLab_Workspaces/${
+                      `~/GenomeLab_Workspaces/${
                         e.target.value.trim().replace(/\s+/g, '_') || 'New_Project'
                       }`
                     );
                   }}
+                  placeholder="e.g. Salmonella_Cohort or My_Project_Analysis"
                   className="gh-input w-full"
                   required
                 />
@@ -415,32 +441,26 @@ export const ProjectsHomeView: React.FC<ProjectsHomeViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-[#1F2328] mb-1">
-                    Organism Kingdom
-                  </label>
-                  <select
-                    value={newOrganism}
-                    onChange={(e) => setNewOrganism(e.target.value)}
-                    className="gh-input w-full"
-                  >
-                    <option value="bacteria">Bacteria (WGS, AMR, Roary, Snippy)</option>
-                    <option value="viral_phage">Viruses & Bacteriophages (10 kb - 250 kb)</option>
-                    <option value="plant_fungi">Fungi, Yeasts & Crop Genomes (10 Mb - 2 Gb)</option>
-                    <option value="human_animal">Human, Mammalian & Diploid (2.8 - 3.1 Gb)</option>
-                    <option value="metagenome">Shotgun Metagenomics (Microbiome MAGs)</option>
-                    <option value="all">Universal / All Organisms</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-[#1F2328] mb-1">
-                    Species / Isolate Label (Freeform)
+                    Organism Kingdom / Category
                   </label>
                   <input
                     type="text"
-                    value={newSpeciesLabel}
-                    onChange={(e) => setNewSpeciesLabel(e.target.value)}
-                    placeholder="e.g. Helicobacter pylori or SARS-CoV-2"
+                    value={newOrganism}
+                    onChange={(e) => setNewOrganism(e.target.value)}
+                    placeholder="e.g. bacteria, viral_phage, plant_fungi, human_animal"
                     className="gh-input w-full font-medium"
-                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-[#1F2328] mb-1">
+                    Strain / Isolate Subtype (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newStrainSubtype}
+                    onChange={(e) => setNewStrainSubtype(e.target.value)}
+                    placeholder="e.g. Strain ATCC 25922, Clade 2b, H37Rv"
+                    className="gh-input w-full font-medium"
                   />
                 </div>
               </div>
@@ -468,6 +488,7 @@ export const ProjectsHomeView: React.FC<ProjectsHomeViewProps> = ({
                   type="text"
                   value={newWslPath}
                   onChange={(e) => setNewWslPath(e.target.value)}
+                  placeholder="~/GenomeLab_Workspaces/Project_Name"
                   className="gh-input w-full font-mono text-[11px]"
                   required
                 />
@@ -481,7 +502,7 @@ export const ProjectsHomeView: React.FC<ProjectsHomeViewProps> = ({
                   type="text"
                   value={newSampleIds}
                   onChange={(e) => setNewSampleIds(e.target.value)}
-                  placeholder="SRR40271360, SRR40271362, SAMPLE_01"
+                  placeholder="e.g. SRR40271360, SRR40271362, SAMPLE_01"
                   className="gh-input w-full font-mono text-[11px]"
                 />
               </div>
@@ -495,7 +516,7 @@ export const ProjectsHomeView: React.FC<ProjectsHomeViewProps> = ({
                   Cancel
                 </button>
                 <button type="submit" className="gh-btn-primary">
-                  Create Universal Project
+                  Create Project
                 </button>
               </div>
             </form>

@@ -8,7 +8,7 @@ RAW_PRESETS: List[Dict[str, Any]] = [
     {
         "id": "preset_salmonella_50",
         "name": "Complete Bacterial WGS, AMR, Pan-Genome & Phylogeny (50-Genome Salmonella Standard)",
-        "subtitle": "★ Gold-Standard Bacterial Pipeline (Reproduces South Asian Livestock Salmonella Study)",
+        "subtitle": "Recommended Bacterial WGS Pipeline (Reproduces South Asian Livestock Salmonella Study)",
         "description": "End-to-end 11-step workflow: SRA Fast Extraction -> FastQC & MultiQC -> fastp Trimming -> SPAdes De Novo Assembly -> QUAST QA -> Prokka Annotation -> ABRicate (ResFinder/VFDB/PlasmidFinder) -> PubMLST -> Roary Pan-Genome -> FastANI -> Snippy Core-SNP -> IQ-TREE 2 + ggtree.",
         "target_organism": "bacteria",
         "estimated_runtime": "~18 mins/genome (with 4-thread laptop thermal protection)",
@@ -43,8 +43,8 @@ RAW_PRESETS: List[Dict[str, Any]] = [
     {
         "id": "preset_ecoli_ref",
         "name": "Reference-Guided Alignment & Variant Calling (E. coli wgs_practice SRR2584863)",
-        "subtitle": "★ Gold-Standard Reference Mapping & GATK/BCFtools/SnpEff Pipeline",
-        "description": "Tailored for your /home/soumandeykakon/wgs_practice dataset: FastQC -> fastp -> BWA-MEM Reference Alignment -> Picard MarkDuplicates -> GATK4 HaplotypeCaller / BCFtools -> SnpEff Variant Annotation -> IGV Session.",
+        "subtitle": "Recommended Reference Mapping & GATK/BCFtools/SnpEff Pipeline",
+        "description": "Standard reference-guided variant pipeline: FastQC -> fastp -> BWA-MEM Reference Alignment -> Picard MarkDuplicates -> GATK4 HaplotypeCaller / BCFtools -> SnpEff Variant Annotation -> IGV Session.",
         "target_organism": "bacteria",
         "estimated_runtime": "~8 mins/sample",
         "nodes": [
@@ -68,7 +68,7 @@ RAW_PRESETS: List[Dict[str, Any]] = [
     {
         "id": "preset_human_gatk",
         "name": "Human & Livestock Diploid Clinical WGS (GATK4 + DeepVariant + VEP/ClinVar)",
-        "subtitle": "★ Gold-Standard Diploid Variant Discovery Pipeline",
+        "subtitle": "Recommended Diploid Variant Discovery Pipeline",
         "description": "Broad Institute GATK Best Practices workflow for human, cattle, poultry, goat, and swine diploid genomes.",
         "target_organism": "human_animal",
         "estimated_runtime": "~45 mins (Region) / ~6 hrs (Whole Diploid Genome)",
@@ -114,7 +114,7 @@ RAW_PRESETS: List[Dict[str, Any]] = [
     {
         "id": "preset_hybrid_longread",
         "name": "Hybrid Illumina + Nanopore/PacBio Complete Circular Genome Pipeline",
-        "subtitle": "★ Gold-Standard Closed Chromosome & Plasmid Assembly",
+        "subtitle": "Recommended Closed Chromosome & Plasmid Assembly",
         "description": "Dorado Basecalling -> NanoPlot -> Filtlong -> Unicycler / Flye Assembly -> Polypolish -> Bakta Standardized Annotation.",
         "target_organism": "bacteria",
         "estimated_runtime": "~25 mins/genome",
@@ -135,7 +135,7 @@ RAW_PRESETS: List[Dict[str, Any]] = [
     {
         "id": "preset_metagenomics",
         "name": "Shotgun Metagenomic Taxonomic, MAG Assembly & Resistome Pipeline",
-        "subtitle": "★ Gold-Standard Microbiome & One-Health Resistome Workflow",
+        "subtitle": "Recommended Microbiome & One-Health Resistome Workflow",
         "description": "fastp -> Bowtie2 Host DNA Depletion -> Kraken2 + Bracken Species Abundance -> MEGAHIT Metagenome Assembly -> CheckM2 -> ABRicate + CARD RGI.",
         "target_organism": "metagenome",
         "estimated_runtime": "~30 mins/sample",

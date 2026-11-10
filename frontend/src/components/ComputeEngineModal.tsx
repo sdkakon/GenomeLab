@@ -72,7 +72,7 @@ export const ComputeEngineModal: React.FC<ComputeEngineModalProps> = ({
                 Personal Computer Compute Engine
               </h2>
               <p className="text-xs text-[#656D76]">
-                Zero-knowledge architecture: All analyses run strictly on your own hardware
+                Local-first execution: All analyses run strictly on your own hardware
               </p>
             </div>
           </div>
@@ -218,7 +218,7 @@ export const ComputeEngineModal: React.FC<ComputeEngineModalProps> = ({
             onClick={onClose}
             className="px-4 py-1.5 bg-[#1F2328] text-white hover:bg-[#2F343C] font-medium rounded-md shadow-xs transition-colors cursor-pointer"
           >
-            Done
+            Close
           </button>
         </div>
       </div>

@@ -253,13 +253,13 @@ export const GenomicsVisualizerView: React.FC<GenomicsVisualizerViewProps> = ({
   };
 
   const navTabs: { id: StudioTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'r_python', label: 'R & Python Visual Studio', icon: Sparkles },
-    { id: 'resistome', label: 'Resistome Matrix', icon: ShieldAlert },
-    { id: 'phylogeny', label: 'Phylogenetic Tree', icon: GitBranch },
-    { id: 'pangenome', label: 'Pan-Genome', icon: Layers },
-    { id: 'fastani', label: 'FastANI Matrix', icon: Grid },
-    { id: 'assembly', label: 'QUAST & Virulome', icon: Dna },
-    { id: 'scripts', label: 'Scripts & iTOL', icon: FileCode },
+    { id: 'r_python', label: '1. Publication Plot Studio', icon: Sparkles },
+    { id: 'resistome', label: '2. AMR & Plasmid Matrix', icon: ShieldAlert },
+    { id: 'phylogeny', label: '3. Phylogenetic Tree', icon: GitBranch },
+    { id: 'pangenome', label: '4. Pan-Genome', icon: Layers },
+    { id: 'fastani', label: '5. FastANI Matrix', icon: Grid },
+    { id: 'assembly', label: '6. QUAST & Virulome', icon: Dna },
+    { id: 'scripts', label: '7. Scripts & iTOL', icon: FileCode },
   ];
 
   return (
@@ -269,7 +269,7 @@ export const GenomicsVisualizerView: React.FC<GenomicsVisualizerViewProps> = ({
         {/* Insights Menu Box */}
         <div className="gh-box shrink-0">
           <div className="gh-box-header">
-            <span className="text-xs font-semibold text-[#1F2328]">Repository Insights</span>
+            <span className="text-xs font-semibold text-[#1F2328]">Analysis Results & Figures</span>
           </div>
           <div className="divide-y divide-[#D0D7DE]/60 bg-white">
             {navTabs.map((t) => {
@@ -428,21 +428,21 @@ export const GenomicsVisualizerView: React.FC<GenomicsVisualizerViewProps> = ({
                 >
                   {vizEngine === 'python' ? (
                     <>
-                      <option value="fastp_qc">Plot: Phred Quality Scores & fastp Filtering</option>
-                      <option value="coverage_depth">Plot: Alignment Coverage Depth & Contig Nx</option>
-                      <option value="variant_dist">Plot: Chromosomal Variant Density & Ti/Tv</option>
-                      <option value="read_length_gc">Plot: Read Length & GC% Distribution Curve</option>
-                      <option value="assembly_comparison">Plot: Contig Size Distribution & QUAST Metrics</option>
-                      <option value="annotation_breakdown">Plot: Genomic Feature Distribution (CDS/tRNA/rRNA)</option>
-                      <option value="amr_virulence_bar">Plot: Acquired Resistome & Virulence Factors</option>
-                      <option value="ani_clustermap">Plot: Pairwise Average Nucleotide Identity (ANI)</option>
+                      <option value="fastp_qc">Phred Quality & fastp Filtering</option>
+                      <option value="coverage_depth">Alignment Coverage Depth & Contig Nx</option>
+                      <option value="variant_dist">Chromosomal Variant Density & Ti/Tv</option>
+                      <option value="read_length_gc">Read Length & GC% Distribution</option>
+                      <option value="assembly_comparison">Contig Size Distribution & QUAST</option>
+                      <option value="annotation_breakdown">Genomic Features (CDS/tRNA/rRNA)</option>
+                      <option value="amr_virulence_bar">Acquired Resistome & Virulence</option>
+                      <option value="ani_clustermap">Pairwise Average Nucleotide Identity (ANI)</option>
                     </>
                   ) : (
                     <>
-                      <option value="contig_lengths">Plot: ggplot2 Contig Length & Read Depth</option>
-                      <option value="amr_matrix">Plot: ggplot2 AMR Resistome & Plasmid Heatmap</option>
-                      <option value="pangenome_pie">Plot: ggplot2 Pan-Genome Allocation</option>
-                      <option value="phylogeny_tree">Plot: ggtree Core-Genome SNP Phylogeny</option>
+                      <option value="contig_lengths">Contig Length & Read Depth (ggplot2)</option>
+                      <option value="amr_matrix">AMR Resistome & Plasmid Heatmap (ggplot2)</option>
+                      <option value="pangenome_pie">Pan-Genome Distribution (ggplot2)</option>
+                      <option value="phylogeny_tree">Core SNP Phylogeny (ggtree)</option>
                     </>
                   )}
                 </select>
@@ -764,7 +764,7 @@ export const GenomicsVisualizerView: React.FC<GenomicsVisualizerViewProps> = ({
                 >
                   <option value="all">All Profiles</option>
                   <option value="mdr">MDR Only</option>
-                  <option value="susc">Susceptible Only</option>
+                  <option value="susc">Non-MDR Only</option>
                 </select>
               </div>
             </div>

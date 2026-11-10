@@ -560,12 +560,13 @@ def execute_job(payload: Dict[str, Any]) -> Dict[str, Any]:
     if mode == "wsl_real":
         try:
             wsl_env_path = (
-                "export PATH=/home/soumandeykakon/miniforge3/envs/wgs_env/bin:"
-                "/home/soumandeykakon/miniforge3/envs/ngs_veterinary/bin:"
-                "/home/soumandeykakon/miniconda3/envs/ngs/bin:/usr/bin:/bin:$PATH"
+                "export PATH=$HOME/miniforge3/envs/wgs_env/bin:"
+                "$HOME/miniforge3/bin:"
+                "/home/soumandeykakon/miniforge3/envs/wgs_env/bin:"
+                "/usr/bin:/bin:$PATH"
             )
             ver_cmd = [
-                "wsl.exe", "-d", "Ubuntu", "-u", "soumandeykakon", "-e", "bash", "-c",
+                "wsl.exe", "-d", "Ubuntu", "-e", "bash", "-c",
                 f"{wsl_env_path}; {tool['binary']} --version 2>&1 | head -n 3 || true",
             ]
             proc = subprocess.run(ver_cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=4.0)
@@ -753,11 +754,11 @@ def create_wsl_folder(path: str, create_standard_subfolders: bool = True) -> Dic
 
 def test_wsl_cli_connection(custom_command: Optional[str] = None) -> Dict[str, Any]:
     default_diag = (
-        "export PATH=/home/soumandeykakon/miniforge3/envs/wgs_env/bin:"
-        "/home/soumandeykakon/miniforge3/envs/ngs_veterinary/bin:"
-        "/home/soumandeykakon/miniforge3/bin:/usr/bin:$PATH; "
+        "export PATH=$HOME/miniforge3/envs/wgs_env/bin:"
+        "$HOME/miniforge3/bin:"
+        "/home/soumandeykakon/miniforge3/envs/wgs_env/bin:/usr/bin:$PATH; "
         "echo '=== 1. WSL2 Linux Kernel & User ==='; uname -srmo; whoami; pwd; "
-        "echo '=== 2. Active WGS Project Folders ==='; ls -d /home/soumandeykakon/NGS_DA /home/soumandeykakon/wgs_practice 2>/dev/null || true; "
+        "echo '=== 2. Active WGS Project Folders ==='; ls -d $HOME/GenomeLab_Workspaces $HOME/NGS_DA $HOME/wgs_practice 2>/dev/null || true; "
         "echo '=== 3. Live Bioinformatics CLI Tool Check ==='; "
         "fastqc --version 2>&1 | head -n 1 || true; "
         "fastp --version 2>&1 | head -n 1 || true; "
@@ -769,14 +770,14 @@ def test_wsl_cli_connection(custom_command: Optional[str] = None) -> Dict[str, A
     )
     cmd_to_run = custom_command.strip() if custom_command and custom_command.strip() else default_diag
     full_bash = (
-        f"export PATH=/home/soumandeykakon/miniforge3/envs/wgs_env/bin:"
-        f"/home/soumandeykakon/miniforge3/envs/ngs_veterinary/bin:"
-        f"/home/soumandeykakon/miniforge3/bin:/usr/bin:$PATH; {cmd_to_run}"
+        f"export PATH=$HOME/miniforge3/envs/wgs_env/bin:"
+        f"$HOME/miniforge3/bin:"
+        f"/home/soumandeykakon/miniforge3/envs/wgs_env/bin:/usr/bin:$PATH; {cmd_to_run}"
     )
 
     try:
         proc = subprocess.run(
-            ["wsl.exe", "-d", "Ubuntu", "-u", "soumandeykakon", "-e", "bash", "-c", full_bash],
+            ["wsl.exe", "-d", "Ubuntu", "-e", "bash", "-c", full_bash],
             capture_output=True,
             text=True,
             stdin=subprocess.DEVNULL,

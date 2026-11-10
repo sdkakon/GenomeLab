@@ -8,8 +8,12 @@ import {
 } from '../types/genome';
 import { ProcessStatusDot } from './ProcessStatusDot';
 import {
+  buildToolStageIoArgs,
+  fetchProjectToolConfigs,
+  saveProjectToolConfig,
+} from '../services/api';
+import {
   Search,
-  Play,
   Code2,
   Flame,
   Star,
@@ -20,6 +24,8 @@ import {
   Copy,
   ShieldCheck,
   Terminal,
+  ArrowRight,
+  CheckCircle2,
 } from 'lucide-react';
 
 export interface ToolsWorkbenchViewProps {
@@ -44,6 +50,8 @@ export interface ToolsWorkbenchViewProps {
   ) => void;
   onRegisterCustomTool: (newTool: Partial<ToolDefinition>) => void;
   processState?: ProcessState;
+  initialStageId?: number;
+  onNavigateTab?: (tab: string) => void;
 }
 
 export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
@@ -58,16 +66,38 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
   onInspectCode,
   onRegisterCustomTool,
   processState,
+  initialStageId = 0,
+  onNavigateTab,
 }) => {
-  const [selectedStageId, setSelectedStageId] = useState<number>(0); // 0 = All stages, or 1..12
+  const [selectedStageId, setSelectedStageId] = useState<number>(initialStageId); // 0 = All stages, or 1..12
   const [selectedToolId, setSelectedToolId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeParamTab, setActiveParamTab] = useState<'standard' | 'advanced' | 'hardware' | 'raw'>('standard');
   const [paramValues, setParamValues] = useState<Record<string, any>>({});
   const [customFlags, setCustomFlags] = useState<string>('');
+  const [savedToolConfigs, setSavedToolConfigs] = useState<Record<string, { params?: Record<string, any>; custom_flags?: string }>>({});
   const [executionMode, setExecutionMode] = useState<'wsl_real' | 'fast_simulation'>('wsl_real');
   const [copiedCmd, setCopiedCmd] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+
+  // Sync stage filter when jumped from another view
+  useEffect(() => {
+    if (initialStageId !== undefined) {
+      setSelectedStageId(initialStageId);
+    }
+  }, [initialStageId]);
+
+  // Load saved per-project tool configs
+  useEffect(() => {
+    if (!activeProject?.id) return;
+    fetchProjectToolConfigs(activeProject.id)
+      .then((configs) => {
+        if (configs && typeof configs === 'object') {
+          setSavedToolConfigs(configs);
+        }
+      })
+      .catch(() => {});
+  }, [activeProject?.id]);
 
   // New Custom Tool modal state
   const [customName, setCustomName] = useState('');
@@ -100,21 +130,36 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
     return visibleTools[0] || tools[0];
   }, [tools, selectedToolId, visibleTools]);
 
-  // Sync active tool and default params
+  // Sync active tool and default/saved params
   useEffect(() => {
     if (
       activeTool &&
       (!paramValues || Object.keys(paramValues).length === 0 || activeTool.id !== selectedToolId)
     ) {
       setSelectedToolId(activeTool.id);
+      const saved = savedToolConfigs[activeTool.id];
       const initial: Record<string, any> = {};
       activeTool.parameters?.forEach((p) => {
-        initial[p.id] = p.default;
+        initial[p.id] = saved?.params?.[p.id] !== undefined ? saved.params[p.id] : p.default;
       });
       setParamValues(initial);
-      setCustomFlags('');
+      setCustomFlags(saved?.custom_flags || '');
     }
-  }, [activeTool?.id]);
+  }, [activeTool?.id, savedToolConfigs]);
+
+  const updateParamsAndPersist = (nextParams: Record<string, any>, nextCustomFlags = customFlags) => {
+    setParamValues(nextParams);
+    if (activeProject?.id && activeTool?.id) {
+      setSavedToolConfigs((prev) => ({
+        ...prev,
+        [activeTool.id]: { params: nextParams, custom_flags: nextCustomFlags },
+      }));
+      saveProjectToolConfig(activeProject.id, activeTool.id, {
+        params: nextParams,
+        custom_flags: nextCustomFlags,
+      }).catch(() => {});
+    }
+  };
 
   // Determine if a tool is recommended for the chosen organism
   const isToolRecommended = (t: ToolDefinition) => {
@@ -125,10 +170,19 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
     );
   };
 
-  // Compile real-time CLI preview
+  // Compile real-time CLI preview with stage-appropriate input/output arguments
   const compiledCommand = useMemo(() => {
     if (!activeTool) return '';
+    const samplePrefix =
+      selectedSamples.length > 0
+        ? selectedSamples[0]
+        : (activeProject?.samples[0]?.id || 'SAMPLE_01');
+    const io = buildToolStageIoArgs(activeTool, samplePrefix);
     const parts: string[] = [activeTool.binary];
+
+    if (io.ioArgs) {
+      parts.push(io.ioArgs);
+    }
 
     activeTool.parameters?.forEach((p) => {
       const val = paramValues[p.id];
@@ -155,10 +209,6 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
       parts.push(customFlags.trim());
     }
 
-    const samplePrefix =
-      selectedSamples.length > 0
-        ? selectedSamples[0]
-        : (activeProject?.samples[0]?.id || 'SAMPLE_01');
     return parts.join(' ').replace(/\$SAMPLE/g, samplePrefix);
   }, [activeTool, paramValues, customFlags, thermalGuard, selectedSamples, activeProject]);
 
@@ -248,11 +298,13 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
                 key={tool.id}
                 onClick={() => {
                   setSelectedToolId(tool.id);
+                  const saved = savedToolConfigs[tool.id];
                   const initial: Record<string, any> = {};
                   tool.parameters?.forEach((p) => {
-                    initial[p.id] = p.default;
+                    initial[p.id] = saved?.params?.[p.id] !== undefined ? saved.params[p.id] : p.default;
                   });
                   setParamValues(initial);
+                  setCustomFlags(saved?.custom_flags || '');
                 }}
                 className={`w-full px-3 py-2 text-left transition-colors flex flex-col gap-0.5 border-l-2 cursor-pointer ${
                   isSelected
@@ -269,17 +321,26 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
                       outputFilesVerified={processState?.outputFilesVerified}
                     />
                     {recommended && (
-                      <Star className="w-3 h-3 fill-[#D97706] text-[#D97706] shrink-0" />
+                      <span title="Recommended tool for this stage">
+                        <Star className="w-3 h-3 fill-[#D97706] text-[#D97706] shrink-0" />
+                      </span>
                     )}
                     <span className="text-xs text-[#1F2328] truncate">{tool.name}</span>
                   </div>
-                  <span className="font-mono text-[10px] text-[#656D76] bg-[#EFF1F3] px-1.5 py-0.5 rounded shrink-0">
+                  <span className="font-mono text-[11px] text-[#656D76] bg-[#EFF1F3] px-1.5 py-0.5 rounded shrink-0">
                     {tool.binary}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-[#656D76]">
                   <span className="truncate">{tool.category || `Stage ${tool.stage_id}`}</span>
-                  <span className="font-mono text-[10px]">S{tool.stage_id}</span>
+                  <div className="flex items-center gap-1">
+                    {recommended && (
+                      <span className="text-[10px] font-medium text-[#9A6700] bg-[#FFF8C5] px-1 rounded">
+                        Recommended
+                      </span>
+                    )}
+                    <span className="font-mono text-[11px]">S{tool.stage_id}</span>
+                  </div>
                 </div>
               </button>
             );
@@ -306,7 +367,12 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
                 <span className="gh-badge hidden sm:inline-flex">
                   Stage {activeTool.stage_id}
                 </span>
-                <span className="gh-badge hidden md:inline-flex font-mono text-[#656D76]">
+                {isToolRecommended(activeTool) && (
+                  <span className="gh-badge bg-[#FFF8C5] text-[#9A6700] border-[#D4A72C]/40 hidden md:inline-flex">
+                    Recommended
+                  </span>
+                )}
+                <span className="gh-badge hidden lg:inline-flex font-mono text-[#656D76]">
                   conda: {activeTool.conda_env || 'wgs_env'}
                 </span>
               </>
@@ -321,8 +387,8 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
               aria-label="Execution Mode"
               className="gh-input py-1 font-medium cursor-pointer"
             >
-              <option value="wsl_real">Mode: WSL2 Ubuntu (Real)</option>
-              <option value="fast_simulation">Mode: Fast Simulation</option>
+              <option value="wsl_real">Engine: Local WSL2</option>
+              <option value="fast_simulation">Engine: Simulated Dry Run</option>
             </select>
 
             <button
@@ -343,11 +409,18 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
 
               return (
                 <button
-                  onClick={() =>
-                    activeTool && onRunTool(activeTool, paramValues, customFlags, executionMode)
-                  }
+                  onClick={() => {
+                    if (!activeTool) return;
+                    if (activeProject?.id) {
+                      saveProjectToolConfig(activeProject.id, activeTool.id, {
+                        params: paramValues,
+                        custom_flags: customFlags,
+                      }).catch(() => {});
+                    }
+                    onRunTool(activeTool, paramValues, customFlags, executionMode);
+                  }}
                   disabled={isCurrentToolRunning}
-                  className="gh-btn-primary flex items-center gap-1.5"
+                  className="gh-btn-execute flex items-center gap-1.5"
                 >
                   <ProcessStatusDot
                     status={
@@ -364,7 +437,7 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
                   />
                   <span>
                     {isCurrentToolRunning
-                      ? 'Processing in WSL2...'
+                      ? 'Running in WSL2...'
                       : isCurrentToolDone
                       ? `Re-run Tool (${selectedSamples.length || 1})`
                       : isCurrentToolFailed
@@ -376,6 +449,49 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
             })()}
           </div>
         </div>
+
+        {/* Inline Stage Completion & Logical Next-Step Banner */}
+        {activeTool &&
+          processState?.toolId === activeTool.id &&
+          processState?.status === 'completed' && (
+            <div className="px-4 py-2 bg-[#DAFBE1] border-b border-[#1A7F37]/30 flex items-center justify-between gap-2 flex-wrap shrink-0">
+              <div className="flex items-center gap-2 text-xs text-[#1A7F37] font-medium">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>
+                  Stage {activeTool.stage_id} ({activeTool.name}) completed for{' '}
+                  <strong>{selectedSamples.length || 1} isolate(s)</strong>.
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {activeTool.stage_id < 12 && (
+                  <button
+                    onClick={() => {
+                      const nextStage = activeTool.stage_id + 1;
+                      setSelectedStageId(nextStage);
+                      const nextStageTool =
+                        tools.find((t) => t.stage_id === nextStage && t.is_gold_standard) ||
+                        tools.find((t) => t.stage_id === nextStage);
+                      if (nextStageTool) {
+                        setSelectedToolId(nextStageTool.id);
+                      }
+                    }}
+                    className="gh-btn-secondary py-1 px-2.5 text-xs font-semibold text-[#1A7F37] border-[#1A7F37]/40 bg-white"
+                  >
+                    <span>Next Step: Stage {activeTool.stage_id + 1}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {onNavigateTab && (
+                  <button
+                    onClick={() => onNavigateTab('visualizer')}
+                    className="gh-btn-secondary py-1 px-2.5 text-xs"
+                  >
+                    <span>View Results & Figures</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
         {/* Box Body: 2-Column Split (Left Parameters | Right CLI Preview & Context) */}
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[#D0D7DE] overflow-hidden">
@@ -412,7 +528,7 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
                 }`}
               >
                 <Flame className="w-3.5 h-3.5 text-[#D97706]" />
-                <span>Hardware Limits</span>
+                <span>Compute Resources</span>
               </button>
               <button
                 onClick={() => setActiveParamTab('raw')}
@@ -422,7 +538,7 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
                     : 'border-transparent text-[#656D76] hover:text-[#1F2328]'
                 }`}
               >
-                Raw Override
+                Additional CLI Flags
               </button>
             </div>
 
@@ -444,7 +560,7 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
                               type="checkbox"
                               checked={!!paramValues[p.id]}
                               onChange={(e) =>
-                                setParamValues({ ...paramValues, [p.id]: e.target.checked })
+                                updateParamsAndPersist({ ...paramValues, [p.id]: e.target.checked })
                               }
                               className="rounded border-[#D0D7DE] text-[#1F2328]"
                             />
@@ -454,7 +570,7 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
                           <select
                             value={paramValues[p.id] ?? p.default}
                             onChange={(e) =>
-                              setParamValues({ ...paramValues, [p.id]: e.target.value })
+                              updateParamsAndPersist({ ...paramValues, [p.id]: e.target.value })
                             }
                             className="gh-input w-full"
                           >
@@ -472,7 +588,7 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
                             max={p.max}
                             step={p.step}
                             onChange={(e) =>
-                              setParamValues({
+                              updateParamsAndPersist({
                                 ...paramValues,
                                 [p.id]:
                                   p.type === 'number' ? Number(e.target.value) : e.target.value,
@@ -511,7 +627,7 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
                           type={p.type === 'number' ? 'number' : 'text'}
                           value={paramValues[p.id] ?? p.default}
                           onChange={(e) =>
-                            setParamValues({
+                            updateParamsAndPersist({
                               ...paramValues,
                               [p.id]: p.type === 'number' ? Number(e.target.value) : e.target.value,
                             })
@@ -524,7 +640,7 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
                   {(!activeTool?.parameters ||
                     activeTool.parameters.filter((p) => p.tier === 'advanced').length === 0) && (
                     <div className="text-xs text-[#656D76] py-6 text-center bg-[#F6F8FA] rounded-md border border-[#D0D7DE]">
-                      No additional advanced flags required. Use Raw Override for custom CLI flags.
+                      No additional advanced flags required. Use Additional CLI Flags for custom options.
                     </div>
                   )}
                 </div>
@@ -535,7 +651,7 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
                   <div className="bg-[#FFF8C5] border border-[#D4A72C]/40 rounded-md p-2.5 text-[#1F2328] text-[11px] flex items-start gap-2">
                     <ShieldCheck className="w-4 h-4 text-[#9A6700] shrink-0 mt-0.5" />
                     <div>
-                      <strong>Laptop Thermal Guard™:</strong> Caps CPU threads and RAM allocation in WSL2 to prevent system freezes.
+                      <strong>Resource & Thermal Protection:</strong> Caps CPU threads and RAM allocation in WSL2 to prevent workstation memory exhaustion.
                     </div>
                   </div>
 
@@ -604,7 +720,11 @@ export const ToolsWorkbenchView: React.FC<ToolsWorkbenchViewProps> = ({
                   <input
                     type="text"
                     value={customFlags}
-                    onChange={(e) => setCustomFlags(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setCustomFlags(next);
+                      updateParamsAndPersist(paramValues, next);
+                    }}
                     placeholder="e.g. --careful --cov-cutoff auto"
                     className="gh-input w-full font-mono"
                   />

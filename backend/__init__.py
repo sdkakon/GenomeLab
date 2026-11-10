@@ -1,1 +1,1 @@
-"""OmniGenome Workbench™ Backend Package."""
+"""GenomeLab Bioinformatics Platform Backend Package."""

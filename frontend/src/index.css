@@ -15,8 +15,11 @@
   body {
     background-color: #FFFFFF;
     color: #1F2328;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv05", "cv08", "cv11";
+  }
+  .font-mono {
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -29,13 +32,19 @@
     @apply bg-[#F6F8FA] border-b border-[#D0D7DE] px-3 py-2 flex items-center justify-between;
   }
   .gh-btn-primary {
-    @apply inline-flex items-center justify-center gap-1.5 bg-[#1F2328] hover:bg-[#32383F] text-white border border-[#1F2328] rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 bg-[#1F2328] hover:bg-[#32383F] text-white border border-[#1F2328] rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969DA] focus-visible:ring-offset-1;
+  }
+  .gh-btn-execute {
+    @apply inline-flex items-center justify-center gap-1.5 bg-[#1F883D] hover:bg-[#1A7F37] text-white border border-[#1A7F37] rounded-md px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969DA] focus-visible:ring-offset-1;
   }
   .gh-btn-secondary {
-    @apply inline-flex items-center justify-center gap-1.5 bg-[#F6F8FA] hover:bg-[#F3F4F6] text-[#24292F] border border-[#D0D7DE] rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 bg-[#F6F8FA] hover:bg-[#F3F4F6] text-[#24292F] border border-[#8C959F]/60 rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969DA] focus-visible:ring-offset-1;
+  }
+  .gh-btn-danger {
+    @apply inline-flex items-center justify-center gap-1.5 bg-[#F6F8FA] hover:bg-[#CF222E] text-[#CF222E] hover:text-white border border-[#CF222E]/40 hover:border-[#CF222E] rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CF222E] focus-visible:ring-offset-1;
   }
   .gh-input {
-    @apply bg-white border border-[#D0D7DE] focus:border-[#0969DA] focus:outline-none focus:ring-2 focus:ring-[#0969DA]/20 rounded-md px-2.5 py-1 text-xs text-[#1F2328] placeholder:text-[#656D76];
+    @apply bg-white border border-[#8C959F]/70 focus:border-[#0969DA] focus:outline-none focus:ring-2 focus:ring-[#0969DA]/20 rounded-md px-2.5 py-1 text-xs text-[#1F2328] placeholder:text-[#57606A];
   }
   .gh-badge {
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border border-[#D0D7DE] bg-[#F6F8FA] text-[#24292F];

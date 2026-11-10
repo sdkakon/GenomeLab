@@ -107,6 +107,12 @@ export function setBackendBaseUrl(url: string): void {
 }
 
 export async function testBackendConnection(url?: string): Promise<{ success: boolean; message: string; version?: string }> {
+  if (typeof window !== 'undefined' && localStorage.getItem('genomelab_sandbox_override') === 'true' && !url) {
+    return {
+      success: false,
+      message: 'Demo Mode (Simulated) explicitly enabled',
+    };
+  }
   const base = (url || getBackendBaseUrl()).replace(/\/+$/, '');
   const testUrl = base.endsWith('/api') ? `${base}/health` : `${base}/api/health`;
   const controller = new AbortController();
@@ -116,16 +122,19 @@ export async function testBackendConnection(url?: string): Promise<{ success: bo
     clearTimeout(timer);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('genomelab_sandbox_override');
+    }
     return {
       success: true,
-      message: `Connected to Personal Computer (${data.platform || 'GenomeLab'} v${data.version || '2.4'})`,
+      message: `Connected to Local Engine (${data.platform || 'GenomeLab'} v${data.version || '2.4'})`,
       version: data.version,
     };
   } catch {
     clearTimeout(timer);
     return {
       success: false,
-      message: 'Local PC engine not detected on this address (Browser Sandbox active)',
+      message: 'Local WSL2 engine not detected on this address (Demo Mode active)',
     };
   }
 }
@@ -189,7 +198,7 @@ const FALLBACK_TOOLS: ToolDefinition[] = [
     example_command: 'fasterq-dump --split-files ERR14794383 -O 01_raw_data -e 4',
     is_gold_standard: true,
     recommended_organisms: ['bacteria', 'human_animal', 'plant_fungi', 'viral_phage', 'metagenome', 'all'],
-    recommendation_badge: '★ Gold Standard — NCBI Fast Extraction',
+    recommendation_badge: 'Recommended — NCBI Fast Extraction',
     parameters: [
       { id: 'split_files', flag: '--split-files', label: 'Split Paired Reads', type: 'boolean', tier: 'standard', default: true, description: 'Splits paired-end reads into _1.fastq and _2.fastq' },
       { id: 'threads', flag: '-e', label: 'CPU Threads', type: 'number', tier: 'hardware', default: 4, min: 1, max: 32, step: 1, description: 'Number of worker threads' },
@@ -213,7 +222,7 @@ const FALLBACK_TOOLS: ToolDefinition[] = [
     example_command: 'fastqc -o 02_quality_control/ -t 4 sample_1.fastq.gz sample_2.fastq.gz',
     is_gold_standard: true,
     recommended_organisms: ['bacteria', 'human_animal', 'plant_fungi', 'viral_phage', 'metagenome', 'all'],
-    recommendation_badge: '★ Gold Standard — Phred Quality Analysis',
+    recommendation_badge: 'Recommended — Phred Quality Analysis',
     parameters: [
       { id: 'nogroup', flag: '--nogroup', label: 'No Grouping', type: 'boolean', tier: 'standard', default: true, description: 'Disable grouping of bases beyond 50 bp for fine resolution' },
       { id: 'threads', flag: '-t', label: 'Threads', type: 'number', tier: 'hardware', default: 4, min: 1, max: 16, step: 1, description: 'Parallel processing threads' },
@@ -237,7 +246,7 @@ const FALLBACK_TOOLS: ToolDefinition[] = [
     example_command: 'fastp -i in_1.fq.gz -I in_2.fq.gz -o out_1.fq.gz -O out_2.fq.gz --detect_adapter_for_pe -q 20 -l 50 -w 4',
     is_gold_standard: true,
     recommended_organisms: ['bacteria', 'human_animal', 'plant_fungi', 'viral_phage', 'metagenome', 'all'],
-    recommendation_badge: '★ Gold Standard — Adapter & Phred Trimmer',
+    recommendation_badge: 'Recommended — Adapter & Phred Trimmer',
     parameters: [
       { id: 'detect_adapter_for_pe', flag: '--detect_adapter_for_pe', label: 'Auto-Detect Adapters', type: 'boolean', tier: 'standard', default: true, description: 'Automatically finds adapters by overlapping paired reads' },
       { id: 'qualified_quality_phred', flag: '-q', label: 'Minimum Phred Quality', type: 'number', tier: 'standard', default: 20, min: 10, max: 35, step: 1, description: 'Phred score threshold (Q20 = 99% accuracy)' },
@@ -263,7 +272,7 @@ const FALLBACK_TOOLS: ToolDefinition[] = [
     example_command: 'spades.py -1 R1.fq.gz -2 R2.fq.gz -o 04_assembly/sample --isolate -k 21,33,55,77 --cov-cutoff auto -t 4 -m 8',
     is_gold_standard: true,
     recommended_organisms: ['bacteria', 'viral_phage', 'all'],
-    recommendation_badge: '★ Gold Standard — Bacterial Isolate Assembler',
+    recommendation_badge: 'Recommended — Bacterial Isolate Assembler',
     parameters: [
       { id: 'mode', flag: '--isolate', label: 'Bacterial Isolate Mode', type: 'boolean', tier: 'standard', default: true, description: 'Optimized for high-coverage single bacterial isolates' },
       { id: 'kmers', flag: '-k', label: 'K-mer Sizes', type: 'text', tier: 'advanced', default: '21,33,55,77', description: 'Comma-separated list of k-mer lengths' },
@@ -290,7 +299,7 @@ const FALLBACK_TOOLS: ToolDefinition[] = [
     example_command: 'quast.py contigs.fasta -o 05_assembly_qc/sample --min-contig 500 -t 4',
     is_gold_standard: true,
     recommended_organisms: ['bacteria', 'plant_fungi', 'metagenome', 'all'],
-    recommendation_badge: '★ Gold Standard — N50 & Assembly QA',
+    recommendation_badge: 'Recommended — N50 & Assembly QA',
     parameters: [
       { id: 'min_contig', flag: '--min-contig', label: 'Min Contig Length (bp)', type: 'number', tier: 'standard', default: 500, min: 100, max: 5000, step: 100, description: 'Minimum contig threshold' },
       { id: 'threads', flag: '-t', label: 'Threads', type: 'number', tier: 'hardware', default: 4, min: 1, max: 16, step: 1, description: 'CPU threads' },
@@ -314,7 +323,7 @@ const FALLBACK_TOOLS: ToolDefinition[] = [
     example_command: 'prokka --outdir 06_annotation/sample --prefix sample --genus Salmonella --species enterica --cpus 4 contigs.fasta',
     is_gold_standard: true,
     recommended_organisms: ['bacteria', 'viral_phage', 'all'],
-    recommendation_badge: '★ Gold Standard — Prokaryotic Annotation',
+    recommendation_badge: 'Recommended — Prokaryotic Annotation',
     parameters: [
       { id: 'genus', flag: '--genus', label: 'Genus', type: 'text', tier: 'standard', default: 'Salmonella', description: 'Genus name for annotation' },
       { id: 'species', flag: '--species', label: 'Species', type: 'text', tier: 'standard', default: 'enterica', description: 'Species name' },
@@ -339,7 +348,7 @@ const FALLBACK_TOOLS: ToolDefinition[] = [
     example_command: 'abricate --db resfinder --minid 80 --mincov 60 --threads 4 contigs.fasta > amr_results.tsv',
     is_gold_standard: true,
     recommended_organisms: ['bacteria', 'metagenome', 'all'],
-    recommendation_badge: '★ Gold Standard — Multi-DB Resistome Screener',
+    recommendation_badge: 'Recommended — Multi-DB Resistome Screener',
     parameters: [
       { id: 'db', flag: '--db', label: 'Database', type: 'select', tier: 'standard', default: 'resfinder', options: [
         { value: 'resfinder', label: 'ResFinder (Acquired AMR)' },
@@ -370,7 +379,7 @@ const FALLBACK_TOOLS: ToolDefinition[] = [
     example_command: 'mlst --threads 4 contigs.fasta',
     is_gold_standard: true,
     recommended_organisms: ['bacteria', 'all'],
-    recommendation_badge: '★ Gold Standard — Classical PubMLST Typing',
+    recommendation_badge: 'Recommended — Classical PubMLST Typing',
     parameters: [
       { id: 'threads', flag: '--threads', label: 'Threads', type: 'number', tier: 'hardware', default: 4, min: 1, max: 16, step: 1, description: 'Threads' },
     ],
@@ -393,7 +402,7 @@ const FALLBACK_TOOLS: ToolDefinition[] = [
     example_command: 'roary -e --mafft -i 95 -cd 99 -p 4 -f 12_pangenome/roary_out 06_annotation/*/*.gff',
     is_gold_standard: true,
     recommended_organisms: ['bacteria', 'all'],
-    recommendation_badge: '★ Gold Standard — Bacterial Pan-Genomics',
+    recommendation_badge: 'Recommended — Bacterial Pan-Genomics',
     parameters: [
       { id: 'mafft_align', flag: '-e --mafft', label: 'MAFFT Core Alignment', type: 'boolean', tier: 'standard', default: true, description: 'Generate multi-FASTA core-gene alignment with MAFFT' },
       { id: 'blastp_identity', flag: '-i', label: 'Min BLASTp % Identity', type: 'number', tier: 'standard', default: 95, min: 70, max: 100, step: 1, description: 'Minimum percent identity for protein clusters' },
@@ -419,7 +428,7 @@ const FALLBACK_TOOLS: ToolDefinition[] = [
     example_command: 'snippy --ref ref.fasta --R1 R1.fq.gz --R2 R2.fq.gz --outdir 11_snippy/sample --cpus 4',
     is_gold_standard: true,
     recommended_organisms: ['bacteria', 'viral_phage', 'all'],
-    recommendation_badge: '★ Gold Standard — Microbial Core-SNP Pipeline',
+    recommendation_badge: 'Recommended — Microbial Core-SNP Pipeline',
     parameters: [
       { id: 'mincov', flag: '--mincov', label: 'Min Site Coverage', type: 'number', tier: 'standard', default: 10, min: 4, max: 50, step: 2, description: 'Minimum read coverage to call a variant' },
       { id: 'minfrac', flag: '--minfrac', label: 'Min Allele Fraction', type: 'number', tier: 'standard', default: 0.9, min: 0.5, max: 1.0, step: 0.05, description: 'Minimum frequency to call homozygous SNP' },
@@ -444,7 +453,7 @@ const FALLBACK_TOOLS: ToolDefinition[] = [
     example_command: 'iqtree2 -s core.aln -m MFP -B 1000 -T AUTO --threads-max 4 -pre phylogeny_out',
     is_gold_standard: true,
     recommended_organisms: ['bacteria', 'plant_fungi', 'viral_phage', 'all'],
-    recommendation_badge: '★ Gold Standard — Publication-Grade ML Tree',
+    recommendation_badge: 'Recommended — Publication-Grade ML Tree',
     parameters: [
       { id: 'model', flag: '-m', label: 'Model Selection', type: 'select', tier: 'standard', default: 'MFP', options: [{ value: 'MFP', label: 'ModelFinder Plus (Automated)' }, { value: 'GTR+G4', label: 'GTR+G4 (Standard)' }], description: 'Substitution model' },
       { id: 'bb', flag: '-B', label: 'Ultrafast Bootstrap Replicates', type: 'number', tier: 'standard', default: 1000, min: 500, max: 5000, step: 100, description: 'UFBoot iterations' },
@@ -459,7 +468,7 @@ const FALLBACK_PROJECTS: Project[] = [
     name: 'South Asian Livestock Salmonella enterica WGS (50 Genomes)',
     organism: 'Salmonella enterica',
     description: 'Whole-Genome Sequencing, AMR, Virulome, Plasmid, Pan-Genome & Core-SNP Phylogenomics of 50 South Asian livestock isolates.',
-    wsl_path: '/home/soumandeykakon/NGS_DA',
+    wsl_path: '~/NGS_DA',
     created_at: '2026-06-20T00:00:00Z',
     sample_count: 50,
     status: 'Completed & Ready',
@@ -470,9 +479,9 @@ const FALLBACK_PROJECTS: Project[] = [
         country: 'Bangladesh',
         host: 'Poultry (Gallus gallus)',
         year: '2023',
-        r1_path: '/home/soumandeykakon/NGS_DA/01_raw_data/ERR14794383_1.fastq.gz',
-        r2_path: '/home/soumandeykakon/NGS_DA/01_raw_data/ERR14794383_2.fastq.gz',
-        assembly_path: '/home/soumandeykakon/NGS_DA/04_assembly/ERR14794383/contigs.fasta',
+        r1_path: '~/NGS_DA/01_raw_data/ERR14794383_1.fastq.gz',
+        r2_path: '~/NGS_DA/01_raw_data/ERR14794383_2.fastq.gz',
+        assembly_path: '~/NGS_DA/04_assembly/ERR14794383/contigs.fasta',
         status: 'Assembled & Profiled',
         genome_size_bp: 4812450,
         gc_percent: 52.1,
@@ -488,9 +497,9 @@ const FALLBACK_PROJECTS: Project[] = [
         country: 'Bangladesh',
         host: 'Bovine (Bos taurus)',
         year: '2023',
-        r1_path: '/home/soumandeykakon/NGS_DA/01_raw_data/ERR14838559_1.fastq.gz',
-        r2_path: '/home/soumandeykakon/NGS_DA/01_raw_data/ERR14838559_2.fastq.gz',
-        assembly_path: '/home/soumandeykakon/NGS_DA/04_assembly/ERR14838559/contigs.fasta',
+        r1_path: '~/NGS_DA/01_raw_data/ERR14838559_1.fastq.gz',
+        r2_path: '~/NGS_DA/01_raw_data/ERR14838559_2.fastq.gz',
+        assembly_path: '~/NGS_DA/04_assembly/ERR14838559/contigs.fasta',
         status: 'Assembled & Profiled',
         genome_size_bp: 4851200,
         gc_percent: 52.2,
@@ -507,7 +516,7 @@ const FALLBACK_PROJECTS: Project[] = [
     name: 'E. coli Practice Cohort (SRR2584863 Reference Mapping)',
     organism: 'Escherichia coli',
     description: 'Alignment, Picard deduplication, GATK4 variant calling, and SnpEff impact analysis.',
-    wsl_path: '/home/soumandeykakon/wgs_practice',
+    wsl_path: '~/wgs_practice',
     created_at: '2026-08-15T00:00:00Z',
     sample_count: 5,
     status: 'Ready for Analysis',
@@ -518,8 +527,8 @@ const FALLBACK_PROJECTS: Project[] = [
         country: 'United States',
         host: 'Laboratory E. coli K-12',
         year: '2022',
-        r1_path: '/home/soumandeykakon/wgs_practice/SRR2584863_1.fastq.gz',
-        r2_path: '/home/soumandeykakon/wgs_practice/SRR2584863_2.fastq.gz',
+        r1_path: '~/wgs_practice/SRR2584863_1.fastq.gz',
+        r2_path: '~/wgs_practice/SRR2584863_2.fastq.gz',
         assembly_path: '',
         status: 'Raw Reads Ready',
         genome_size_bp: 4641652,
@@ -538,10 +547,10 @@ const FALLBACK_PRESETS: PipelinePreset[] = [
   {
     id: 'preset_salmonella_50',
     name: 'Complete Bacterial WGS, AMR, Pan-Genome & Phylogeny (50-Genome Standard)',
-    subtitle: '★ Gold-Standard Bacterial Pipeline (Reproduces South Asian Livestock Salmonella Study)',
-    description: 'End-to-end 12-step workflow from raw SRA ingestion to IQ-TREE 2 publication phylogeny with thermal safety protection.',
+    subtitle: 'Recommended Bacterial WGS Pipeline (Reproduces South Asian Livestock Salmonella Study)',
+    description: 'End-to-end 11-step workflow from raw SRA ingestion to IQ-TREE 2 publication phylogeny with thermal safety protection.',
     target_organism: 'bacteria',
-    estimated_runtime: '~18 mins/genome (at 4-thread laptop thermal guard)',
+    estimated_runtime: '~18 mins/genome (at 4-thread resource protection)',
     nodes: [
       { id: 'n1', tool_id: 'fasterq_dump', label: '1. fasterq-dump SRA', stage_id: 1, x: 40, y: 80, parameters: { split_files: true, threads: 4 } },
       { id: 'n2', tool_id: 'fastqc', label: '2. FastQC + MultiQC', stage_id: 2, x: 260, y: 80, parameters: { nogroup: true, threads: 4 } },
@@ -568,13 +577,51 @@ const FALLBACK_PRESETS: PipelinePreset[] = [
       { id: 'e10', source: 'n10', target: 'n11', data_format: 'CORE_ALN' },
     ],
   },
+  {
+    id: 'preset_ecoli_ref',
+    name: 'Reference-Guided Alignment & Variant Calling (E. coli SRR2584863)',
+    subtitle: 'Recommended Reference Mapping & Core-SNP Pipeline',
+    description: 'FastQC -> fastp Read Trimming -> Snippy / BWA Reference Alignment & Variant Calling -> IQ-TREE 2 Phylogeny.',
+    target_organism: 'bacteria',
+    estimated_runtime: '~8 mins/sample',
+    nodes: [
+      { id: 'r1', tool_id: 'fastqc', label: '1. FastQC Raw Reads', stage_id: 2, x: 60, y: 140, parameters: { nogroup: true, threads: 4 } },
+      { id: 'r2', tool_id: 'fastp', label: '2. fastp Quality Trim', stage_id: 3, x: 300, y: 140, parameters: { detect_adapter_for_pe: true, qualified_quality_phred: 20, threads: 4 } },
+      { id: 'r3', tool_id: 'snippy', label: '3. Snippy Reference Variants', stage_id: 11, x: 540, y: 140, parameters: { mincov: 10, minfrac: 0.9, threads: 4 } },
+      { id: 'r4', tool_id: 'iqtree2', label: '4. IQ-TREE 2 Phylogeny', stage_id: 12, x: 780, y: 140, parameters: { model: 'MFP', bb: 1000, threads: 4 } },
+    ],
+    edges: [
+      { id: 're1', source: 'r1', target: 'r2', data_format: 'FASTQ_PE' },
+      { id: 're2', source: 'r2', target: 'r3', data_format: 'FASTQ_PE' },
+      { id: 're3', source: 'r3', target: 'r4', data_format: 'CORE_ALN' },
+    ],
+  },
+  {
+    id: 'preset_amr_triage',
+    name: 'Rapid Clinical AMR, Plasmid & Sequence Typing Triage',
+    subtitle: 'Fast 10-Minute Surveillance Pipeline',
+    description: 'fastp -> SPAdes Fast Assembly -> ABRicate AMR/Plasmid Screening -> PubMLST Sequence Typing.',
+    target_organism: 'bacteria',
+    estimated_runtime: '~9 mins/sample',
+    nodes: [
+      { id: 'a1', tool_id: 'fastp', label: '1. fastp Clean', stage_id: 3, x: 60, y: 160, parameters: { threads: 4 } },
+      { id: 'a2', tool_id: 'spades', label: '2. SPAdes Assembly', stage_id: 5, x: 300, y: 160, parameters: { mode: true, threads: 4, memory_gb: 8 } },
+      { id: 'a3', tool_id: 'abricate', label: '3. ABRicate Resistome', stage_id: 8, x: 560, y: 100, parameters: { db: 'resfinder', minid: 80, mincov: 60, threads: 4 } },
+      { id: 'a4', tool_id: 'mlst', label: '4. PubMLST Sequence Type', stage_id: 9, x: 560, y: 240, parameters: { threads: 4 } },
+    ],
+    edges: [
+      { id: 'ae1', source: 'a1', target: 'a2', data_format: 'FASTQ_PE' },
+      { id: 'ae2', source: 'a2', target: 'a3', data_format: 'FASTA_CONTIGS' },
+      { id: 'ae3', source: 'a2', target: 'a4', data_format: 'FASTA_CONTIGS' },
+    ],
+  },
 ];
 
 const FALLBACK_WSL_STATUS: WSLStatus = {
   wsl_available: true,
   distro: 'Ubuntu 22.04 LTS (WSL2)',
   kernel: 'Linux 5.15.153.1-microsoft-standard-WSL2',
-  user: 'soumandeykakon',
+  user: 'ubuntu',
   cpu_model: 'AMD Ryzen 7 / Intel Core i7 (8 Cores / 16 Threads)',
   total_cores: 16,
   recommended_threads: 4,
@@ -582,75 +629,185 @@ const FALLBACK_WSL_STATUS: WSLStatus = {
   recommended_ram_gb: 8,
   recommended_cooldown_sec: 180,
   conda_environments: [
-    { name: 'wgs_env', path: '/home/soumandeykakon/miniforge3/envs/wgs_env', python_version: '3.10.13', tool_count: 42, description: 'Primary environment with SPAdes, Prokka, Roary, ABRicate, IQ-TREE 2', key_tools: ['spades', 'prokka', 'roary', 'abricate', 'iqtree2', 'snippy'] },
-    { name: 'wgs_env', path: '/home/soumandeykakon/miniforge3/envs/wgs_env', python_version: '3.9.18', tool_count: 28, description: 'Reference alignment and GATK variant calling suite', key_tools: ['bwa', 'samtools', 'gatk4', 'snpeff'] },
+    { name: 'wgs_env', path: '~/miniforge3/envs/wgs_env', python_version: '3.10.13', tool_count: 87, description: 'Unified Miniforge3 WGS environment (SPAdes, Prokka, Bakta, Roary, ABRicate, IQ-TREE 2, GATK4)', key_tools: ['spades', 'prokka', 'roary', 'abricate', 'iqtree2', 'snippy', 'bwa', 'samtools'] },
+    { name: 'base', path: '~/miniforge3', python_version: '3.10.13', tool_count: 14, description: 'Miniforge3 base package manager environment (conda & mamba)', key_tools: ['conda', 'mamba', 'python3'] },
   ],
   detected_binaries: [
-    { tool_id: 'spades', name: 'SPAdes Genome Assembler', binary: 'spades.py', conda_env: 'wgs_env', path: '/home/soumandeykakon/miniforge3/envs/wgs_env/bin/spades.py', version: '3.15.5', installed: true },
-    { tool_id: 'prokka', name: 'Prokka Annotation', binary: 'prokka', conda_env: 'wgs_env', path: '/home/soumandeykakon/miniforge3/envs/wgs_env/bin/prokka', version: '1.14.6', installed: true },
-    { tool_id: 'abricate', name: 'ABRicate Screener', binary: 'abricate', conda_env: 'wgs_env', path: '/home/soumandeykakon/miniforge3/envs/wgs_env/bin/abricate', version: '1.0.1', installed: true },
-    { tool_id: 'roary', name: 'Roary Pan-Genome', binary: 'roary', conda_env: 'wgs_env', path: '/home/soumandeykakon/miniforge3/envs/wgs_env/bin/roary', version: '3.13.0', installed: true },
-    { tool_id: 'iqtree2', name: 'IQ-TREE 2 ML Phylogenomics', binary: 'iqtree2', conda_env: 'wgs_env', path: '/home/soumandeykakon/miniforge3/envs/wgs_env/bin/iqtree2', version: '2.2.6', installed: true },
+    { tool_id: 'spades', name: 'SPAdes Genome Assembler', binary: 'spades.py', conda_env: 'wgs_env', path: '~/miniforge3/envs/wgs_env/bin/spades.py', version: '3.15.5', installed: true },
+    { tool_id: 'prokka', name: 'Prokka Annotation', binary: 'prokka', conda_env: 'wgs_env', path: '~/miniforge3/envs/wgs_env/bin/prokka', version: '1.14.6', installed: true },
+    { tool_id: 'abricate', name: 'ABRicate Screener', binary: 'abricate', conda_env: 'wgs_env', path: '~/miniforge3/envs/wgs_env/bin/abricate', version: '1.0.1', installed: true },
+    { tool_id: 'roary', name: 'Roary Pan-Genome', binary: 'roary', conda_env: 'wgs_env', path: '~/miniforge3/envs/wgs_env/bin/roary', version: '3.13.0', installed: true },
+    { tool_id: 'iqtree2', name: 'IQ-TREE 2 ML Phylogenomics', binary: 'iqtree2', conda_env: 'wgs_env', path: '~/miniforge3/envs/wgs_env/bin/iqtree2', version: '2.2.6', installed: true },
   ],
 };
+
+export function buildToolStageIoArgs(tool: ToolDefinition, sampleName = 'ERR14794383'): { ioArgs: string; inputPath: string; outputPath: string } {
+  switch (tool.stage_id) {
+    case 1:
+      return {
+        inputPath: sampleName,
+        outputPath: `01_raw_data/${sampleName}_1.fastq.gz`,
+        ioArgs: `${sampleName} -O 01_raw_data/`,
+      };
+    case 2:
+      return {
+        inputPath: `01_raw_data/${sampleName}_1.fastq.gz 01_raw_data/${sampleName}_2.fastq.gz`,
+        outputPath: `02_quality_control/${sampleName}_fastqc.html`,
+        ioArgs: `-o 02_quality_control/ 01_raw_data/${sampleName}_1.fastq.gz 01_raw_data/${sampleName}_2.fastq.gz`,
+      };
+    case 3:
+      return {
+        inputPath: `01_raw_data/${sampleName}_1.fastq.gz`,
+        outputPath: `03_trimmed_reads/${sampleName}_R1.trimmed.fastq.gz`,
+        ioArgs: `-i 01_raw_data/${sampleName}_1.fastq.gz -I 01_raw_data/${sampleName}_2.fastq.gz -o 03_trimmed_reads/${sampleName}_R1.trimmed.fastq.gz -O 03_trimmed_reads/${sampleName}_R2.trimmed.fastq.gz -h 03_trimmed_reads/${sampleName}_fastp.html`,
+      };
+    case 4:
+      return {
+        inputPath: `03_trimmed_reads/${sampleName}_R1.trimmed.fastq.gz`,
+        outputPath: `04_taxonomy/${sampleName}_report.tsv`,
+        ioArgs: `--paired 03_trimmed_reads/${sampleName}_R1.trimmed.fastq.gz 03_trimmed_reads/${sampleName}_R2.trimmed.fastq.gz --report 04_taxonomy/${sampleName}_report.tsv`,
+      };
+    case 5:
+      return {
+        inputPath: `03_trimmed_reads/${sampleName}_R1.trimmed.fastq.gz`,
+        outputPath: `04_assembly/${sampleName}/contigs.fasta`,
+        ioArgs: `-1 03_trimmed_reads/${sampleName}_R1.trimmed.fastq.gz -2 03_trimmed_reads/${sampleName}_R2.trimmed.fastq.gz -o 04_assembly/${sampleName}`,
+      };
+    case 6:
+      return {
+        inputPath: `04_assembly/${sampleName}/contigs.fasta`,
+        outputPath: `05_assembly_qc/${sampleName}/report.html`,
+        ioArgs: `04_assembly/${sampleName}/contigs.fasta -o 05_assembly_qc/${sampleName}`,
+      };
+    case 7:
+      return {
+        inputPath: `04_assembly/${sampleName}/contigs.fasta`,
+        outputPath: `06_annotation/${sampleName}/${sampleName}.gff`,
+        ioArgs: `--outdir 06_annotation/${sampleName} --prefix ${sampleName} 04_assembly/${sampleName}/contigs.fasta`,
+      };
+    case 8:
+      return {
+        inputPath: `04_assembly/${sampleName}/contigs.fasta`,
+        outputPath: `07_amr_profiling/${sampleName}_amr.tsv`,
+        ioArgs: `04_assembly/${sampleName}/contigs.fasta > 07_amr_profiling/${sampleName}_amr.tsv`,
+      };
+    case 9:
+      return {
+        inputPath: `04_assembly/${sampleName}/contigs.fasta`,
+        outputPath: `08_typing/${sampleName}_mlst.tsv`,
+        ioArgs: `04_assembly/${sampleName}/contigs.fasta > 08_typing/${sampleName}_mlst.tsv`,
+      };
+    case 10:
+      return {
+        inputPath: `06_annotation/*/*.gff`,
+        outputPath: `12_pangenome/gene_presence_absence.csv`,
+        ioArgs: `-f 12_pangenome/roary_out 06_annotation/*/*.gff`,
+      };
+    case 11:
+      return {
+        inputPath: `03_trimmed_reads/${sampleName}_R1.trimmed.fastq.gz`,
+        outputPath: `11_snippy/${sampleName}/snps.vcf`,
+        ioArgs: `--ref reference.gbk --R1 03_trimmed_reads/${sampleName}_R1.trimmed.fastq.gz --R2 03_trimmed_reads/${sampleName}_R2.trimmed.fastq.gz --outdir 11_snippy/${sampleName}`,
+      };
+    case 12:
+    default:
+      return {
+        inputPath: `11_snippy/core.aln`,
+        outputPath: `13_figures/core.treefile`,
+        ioArgs: `-s 11_snippy/core.aln -pre 13_figures/core`,
+      };
+  }
+}
 
 export function generateFallbackInspection(
   toolId: string,
   params?: Record<string, any>,
-  sampleName = 'ERR14794383'
+  sampleName = 'ERR14794383',
+  customFlags = ''
 ): CodeInspectionResult {
   const tool = FALLBACK_TOOLS.find((t) => t.id === toolId) || FALLBACK_TOOLS[3];
-  const threads = params?.threads || 4;
-  const mem = params?.memory_gb || 8;
-  const singleCmd = `${tool.binary} -1 03_trimmed_reads/${sampleName}_R1.trimmed.fastq.gz -2 03_trimmed_reads/${sampleName}_R2.trimmed.fastq.gz -o 04_assembly/${sampleName} --isolate -t ${threads} -m ${mem}`;
-  const wslCmd = `wsl.exe -d Ubuntu -e bash -c "source ~/.bashrc && conda activate ${tool.conda_env} && ${singleCmd}"`;
+  const mergedParams: Record<string, any> = {};
+  for (const p of tool.parameters || []) {
+    mergedParams[p.id] = params?.[p.id] !== undefined ? params[p.id] : p.default;
+  }
+  const threads = mergedParams.threads || params?.threads || 4;
+  const mem = mergedParams.memory_gb || params?.memory_gb || 8;
+
+  const flagParts: string[] = [];
+  const breakdown: CodeInspectionResult['flag_breakdown'] = [
+    {
+      token: tool.binary,
+      category: 'Core Executable',
+      meaning: `Launches ${tool.name} (v${tool.version}) from the ${tool.conda_env} environment.`,
+      why_used: tool.short_description,
+    },
+  ];
+
+  for (const p of tool.parameters || []) {
+    const val = mergedParams[p.id];
+    if (p.type === 'boolean') {
+      if (val) {
+        flagParts.push(p.flag);
+        breakdown.push({
+          token: p.flag,
+          category: p.tier === 'hardware' ? 'Compute Resource' : 'Tool Parameter',
+          meaning: p.label,
+          why_used: p.description,
+        });
+      }
+    } else if (val !== undefined && val !== '') {
+      const token = `${p.flag} ${val}`;
+      flagParts.push(token);
+      breakdown.push({
+        token,
+        category: p.tier === 'hardware' ? 'Compute Resource' : 'Tool Parameter',
+        meaning: `${p.label}: ${val}`,
+        why_used: p.description,
+      });
+    }
+  }
+
+  if (customFlags && customFlags.trim()) {
+    flagParts.push(customFlags.trim());
+    breakdown.push({
+      token: customFlags.trim(),
+      category: 'Additional Flags',
+      meaning: 'User-specified CLI arguments appended to the tool invocation.',
+      why_used: 'Enables fine-grained control over advanced tool options.',
+    });
+  }
+
+  const { ioArgs, inputPath, outputPath } = buildToolStageIoArgs(tool, sampleName);
+  breakdown.push({
+    token: ioArgs,
+    category: 'I/O Streams',
+    meaning: `Reads input (${inputPath}) and writes stage output (${outputPath}).`,
+    why_used: 'Maintains standardized per-stage directory structure across the project cohort.',
+  });
+
+  const singleCmd = `${tool.binary} ${flagParts.join(' ')} ${ioArgs}`.replace(/\s+/g, ' ').trim();
+  const wslCmd = `wsl.exe -d Ubuntu -e bash -c "conda run -n ${tool.conda_env} ${singleCmd}"`;
 
   return {
     tool_id: tool.id,
     tool_name: tool.name,
     stage_name: tool.stage_name,
     conda_env: tool.conda_env,
-    conda_activation_cmd: `conda activate /home/soumandeykakon/miniforge3/envs/${tool.conda_env}`,
+    conda_activation_cmd: `conda activate ${tool.conda_env}`,
     single_sample_command: singleCmd,
     wsl_wrapped_command: wslCmd,
-    flag_breakdown: [
-      {
-        token: tool.binary,
-        category: 'Core Executable',
-        meaning: `Launches ${tool.name} (v${tool.version}) directly from the conda environment.`,
-        why_used: tool.short_description,
-      },
-      {
-        token: `-1 ... -2 ... -o ...`,
-        category: 'I/O Streams',
-        meaning: `Specifies paired-end inputs and writes outputs into isolate directories.`,
-        why_used: `Ensures clean per-sample directory organization without overwriting cohort files.`,
-      },
-      {
-        token: `-t ${threads}`,
-        category: 'Hardware Safety',
-        meaning: `Allocates ${threads} CPU worker threads to execute parallel computations.`,
-        why_used: `Limits CPU core saturation to keep laptop temperatures below 85°C.`,
-      },
-      {
-        token: `-m ${mem}`,
-        category: 'Memory Guard',
-        meaning: `Caps RAM consumption at ${mem} GB to prevent Linux out-of-memory (OOM) killer.`,
-        why_used: `Safeguards host Windows 11 system stability during heavy graph construction.`,
-      },
-    ],
+    flag_breakdown: breakdown,
     bash_batch_script: `#!/usr/bin/env bash
 # ==============================================================================
-# OmniGenome Workbench™ — Automated Batch Script with Thermal Cooldown
-# Tool: ${tool.name} | Cohort: 50+ Genomes
+# GenomeLab v2.4 — Automated Batch Script with Resource Protection
+# Tool: ${tool.name} | Stage: ${tool.stage_name}
 # ==============================================================================
 set -euo pipefail
 
-ENV_PATH="/home/soumandeykakon/miniforge3/envs/${tool.conda_env}"
 source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate "\${ENV_PATH}"
+conda activate "${tool.conda_env}"
 
-mkdir -p 04_assembly logs
+mkdir -p 01_raw_data 02_quality_control 03_trimmed_reads 04_assembly 05_assembly_qc 06_annotation 07_amr_profiling 08_typing 11_snippy 12_pangenome 13_figures logs
 
 SAMPLES=(
   "ERR14794383" "ERR14838559" "SRR14421695" "SRR17139628" "SRR2584863"
@@ -659,37 +816,31 @@ SAMPLES=(
 TOTAL=\${#SAMPLES[@]}
 COUNT=0
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting automated batch run of \${TOTAL} genomes with ${tool.name}..."
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting batch run of \${TOTAL} samples with ${tool.name}..."
 
 for SAMPLE in "\${SAMPLES[@]}"; do
   COUNT=$((COUNT + 1))
   echo "------------------------------------------------------------------------"
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Processing sample [\${COUNT}/\${TOTAL}]: \${SAMPLE}"
 
-  ${tool.binary} \\
-    -1 "03_trimmed_reads/\${SAMPLE}_R1.trimmed.fastq.gz" \\
-    -2 "03_trimmed_reads/\${SAMPLE}_R2.trimmed.fastq.gz" \\
-    -o "04_assembly/\${SAMPLE}" \\
-    --isolate \\
-    -t ${threads} \\
-    -m ${mem} 2>&1 | tee "logs/\${SAMPLE}_${tool.id}.log"
+  ${singleCmd.split(sampleName).join('${SAMPLE}')} 2>&1 | tee "logs/\${SAMPLE}_${tool.id}.log"
 
-  # Thermal Cooldown Guard: Allow CPU heatsinks to drop to ambient temperature
+  # Thermal Cooldown Guard: Allow CPU heatsinks to stabilize between samples
   if [ \${COUNT} -lt \${TOTAL} ]; then
-    echo "[THERMAL GUARD] Cooling down CPU for 180 seconds before next genome..."
+    echo "[RESOURCE GUARD] Cooling down CPU for 180 seconds before next sample..."
     sleep 180
   fi
 done
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Batch completed successfully for \${TOTAL} genomes!"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Batch completed for \${TOTAL} samples."
 `,
     nextflow_dsl2_script: `// =============================================================================
-// OmniGenome Workbench™ — Nextflow DSL2 Portable Production Workflow
+// GenomeLab v2.4 — Nextflow DSL2 Portable Production Workflow
 // Tool: ${tool.name}
 // =============================================================================
 nextflow.enable.dsl=2
 
-params.reads = "03_trimmed_reads/*_{R1,R2}.trimmed.fastq.gz"
+params.input = "${inputPath}"
 params.outdir = "results"
 params.threads = ${threads}
 params.max_memory = "${mem}.GB"
@@ -697,32 +848,23 @@ params.max_memory = "${mem}.GB"
 process ${tool.id.toUpperCase()}_STEP {
     tag "$sample_id"
     conda "${tool.conda_env}"
-    publishDir "\${params.outdir}/assembly/\${sample_id}", mode: 'copy'
+    publishDir "\${params.outdir}/${tool.id}/\${sample_id}", mode: 'copy'
 
     input:
-    tuple val(sample_id), path(reads)
+    val(sample_id)
 
     output:
-    tuple val(sample_id), path("contigs.fasta"), emit: contigs
-    path("*.log"), emit: logs
+    path("*"), emit: results
 
     script:
     """
-    ${tool.binary} \\
-        -1 \${reads[0]} \\
-        -2 \${reads[1]} \\
-        -o . \\
-        --isolate \\
-        -t \${task.cpus} \\
-        -m \${task.memory.toGiga()}
+    ${singleCmd.split(sampleName).join('${sample_id}')}
     """
 }
 
 workflow {
-    read_pairs_ch = Channel
-        .fromFilePairs(params.reads, checkIfExists: true)
-
-    ${tool.id.toUpperCase()}_STEP(read_pairs_ch)
+    samples_ch = Channel.of("${sampleName}")
+    ${tool.id.toUpperCase()}_STEP(samples_ch)
 }
 `,
     conda_yaml: `name: ${tool.conda_env}
@@ -735,10 +877,10 @@ dependencies:
   - ${tool.conda_package}>=${tool.version}
 `,
     beginner_tips: [
-      `Always check the log file (e.g. \`logs/${sampleName}_${tool.id}.log\`) to verify successful completion and exit code 0.`,
-      `For laptop runs, keep threads capped at 4 to prevent heavy CPU thermal throttling (>90°C).`,
-      `Outputs are organized per-sample into isolate subdirectories for clean downstream multi-sample aggregation.`,
-      `This exact CLI command can be pasted into any Ubuntu or WSL terminal after activating the conda environment.`,
+      `Inspect the log file (\`logs/${sampleName}_${tool.id}.log\`) to verify completion and exit code 0.`,
+      `For laptop execution, keep worker threads capped at 4 to prevent CPU thermal throttling (>90°C).`,
+      `Outputs are written to ${outputPath} for automatic downstream stage discovery.`,
+      `This command can be executed directly in any Ubuntu or WSL2 terminal after activating \`${tool.conda_env}\`.`,
     ],
   };
 }
@@ -808,7 +950,7 @@ const FALLBACK_RESULTS: ResultsSummary = {
   ],
   phylogeny: {
     newick: '(((ERR14794383:0.00012,ERR14838559:0.00015):0.00035,SRR17139628:0.00028):0.0042,SRR14421695:0.0068);',
-    tree_path: '/home/soumandeykakon/NGS_DA/Evolutionary_Tree_50_Genomes/core.tree',
+    tree_path: '~/NGS_DA/Evolutionary_Tree_50_Genomes/core.tree',
     alignment_length_bp: 32410,
     core_snps: 1842,
     model: 'GTR+F+I+G4 (ModelFinder Best-Fit)',
@@ -820,7 +962,7 @@ const FALLBACK_RESULTS: ResultsSummary = {
     ],
   },
   export_scripts: {
-    r_ggtree: `# OmniGenome Workbench™ — Publication-Grade ggtree + ggtreeExtra Script\nlibrary(ggtree)\nlibrary(ggtreeExtra)\nlibrary(ggplot2)\n\ntree <- read.tree("Evolutionary_Tree_50_Genomes/core.tree")\np <- ggtree(tree, layout="rectangular", size=0.8) + geom_tiplab(size=3, align=TRUE)\nggsave("publication_tree.pdf", p, width=10, height=8, dpi=600)\n`,
+    r_ggtree: `# GenomeLab v2.4 — Publication-Grade ggtree + ggtreeExtra Script\nlibrary(ggtree)\nlibrary(ggtreeExtra)\nlibrary(ggplot2)\n\ntree <- read.tree("Evolutionary_Tree_50_Genomes/core.tree")\np <- ggtree(tree, layout="rectangular", size=0.8) + geom_tiplab(size=3, align=TRUE)\nggsave("publication_tree.pdf", p, width=10, height=8, dpi=600)\n`,
     python_seaborn: `import pandas as pd\nimport seaborn as sns\nimport matplotlib.pyplot as plt\n\ndf = pd.read_csv("amr_matrix.csv", index_col=0)\nplt.figure(figsize=(12, 8))\nsns.heatmap(df, cmap="YlOrRd", linewidths=0.5)\nplt.title("Cohort AMR Gene Identity Matrix (50 Genomes)")\nplt.tight_layout()\nplt.savefig("amr_heatmap.pdf", dpi=600)\n`,
     itol_colorstrip: `DATASET_COLORSTRIP\nSEPARATOR TAB\nDATASET_LABEL\tHost_Source\nCOLOR\t#3B82F6\nDATA\nERR14794383\t#EF4444\tPoultry\nERR14838559\t#10B981\tBovine\n`,
     itol_binary: `DATASET_BINARY\nSEPARATOR TAB\nDATASET_LABEL\tAMR_Presence\nFIELD_LABELS\taac(6)-Iaa\ttet(A)\tsul1\tqnrS1\nDATA\nERR14794383\t1\t1\t1\t1\nERR14838559\t1\t1\t0\t1\n`,
@@ -846,12 +988,13 @@ const FALLBACK_JOBS: JobRecord[] = [
     completed_at: '2026-11-09T03:04:12Z',
     duration_seconds: 252,
     exit_code: 0,
+    output_files: ['04_assembly/ERR14794383/contigs.fasta', '04_assembly/ERR14794383/scaffolds.fasta', '04_assembly/ERR14794383/spades.log'],
     logs: [
-      '[00:00:01] Command: spades.py -1 03_trimmed_reads/ERR14794383_R1.trimmed.fastq.gz -2 03_trimmed_reads/ERR14794383_R2.trimmed.fastq.gz -o 04_assembly/ERR14794383 --isolate -t 4 -m 8',
+      '[00:00:01] Command: spades.py --isolate -k 21,33,55,77 --cov-cutoff auto -t 4 -m 8 -1 03_trimmed_reads/ERR14794383_R1.trimmed.fastq.gz -2 03_trimmed_reads/ERR14794383_R2.trimmed.fastq.gz -o 04_assembly/ERR14794383',
       '[00:00:15] Running BayesHammer read error correction...',
       '[00:01:45] Assembling iterative de Bruijn graphs (k=21, 33, 55, 77)...',
       '[00:03:50] Simplifying assembly graph & resolving repeats...',
-      '[00:04:12] Output written to 04_assembly/ERR14794383/contigs.fasta (42 contigs, N50: 245,800 bp). Done!',
+      '[00:04:12] Output written to 04_assembly/ERR14794383/contigs.fasta (42 contigs, N50: 245,800 bp). Done.',
     ],
     code_inspection: generateFallbackInspection('spades', { threads: 4, memory_gb: 8 }, 'ERR14794383'),
   },
@@ -872,10 +1015,11 @@ const FALLBACK_JOBS: JobRecord[] = [
     completed_at: '2026-11-09T03:05:04Z',
     duration_seconds: 4.1,
     exit_code: 0,
+    output_files: ['07_amr_profiling/ERR14794383_amr.tsv'],
     logs: [
       '[00:00:01] Scanning 04_assembly/ERR14794383/contigs.fasta against resfinder database...',
       '[00:00:03] Detected 5 resistance genes: aac(6\')-Iaa, tet(A), sul1, qnrS1, blaTEM-1B.',
-      '[00:00:04] Summary TSV saved to 07_amr_profiling/ERR14794383_resfinder.tsv.',
+      '[00:00:04] Summary TSV saved to 07_amr_profiling/ERR14794383_amr.tsv.',
     ],
     code_inspection: generateFallbackInspection('abricate', { db: 'resfinder', minid: 80, mincov: 60, threads: 4 }, 'ERR14794383'),
   },
@@ -1029,7 +1173,8 @@ export async function inspectCode(payload: {
   const fallback = generateFallbackInspection(
     payload.tool_id,
     payload.parameters,
-    payload.sample_name || (payload.samples && payload.samples[0]) || 'ERR14794383'
+    payload.sample_name || (payload.samples && payload.samples[0]) || 'ERR14794383',
+    payload.custom_flags || ''
   );
   return request<CodeInspectionResult>(
     '/code/inspect',
@@ -1049,9 +1194,12 @@ export async function executeJob(payload: {
   thermal_guard: ThermalGuardConfig;
 }): Promise<JobRecord> {
   const tool = FALLBACK_TOOLS.find((t) => t.id === payload.tool_id) || FALLBACK_TOOLS[3];
+  const primarySample = payload.samples[0] || 'ERR14794383';
+  const { outputPath } = buildToolStageIoArgs(tool, primarySample);
+  const insp = generateFallbackInspection(payload.tool_id, payload.parameters, primarySample, payload.custom_flags);
   const newJob: JobRecord = {
     id: `job_${Date.now()}`,
-    name: `${tool.name} Run`,
+    name: `${tool.name} (${payload.samples.length} sample${payload.samples.length !== 1 ? 's' : ''})`,
     project_id: payload.project_id,
     tool_id: payload.tool_id,
     tool_name: tool.name,
@@ -1066,12 +1214,14 @@ export async function executeJob(payload: {
     completed_at: new Date().toISOString(),
     duration_seconds: 3.5,
     exit_code: 0,
+    output_files: [outputPath, `logs/${primarySample}_${tool.id}.log`],
     logs: [
-      `[00:00:01] Initializing ${tool.name} in WSL2 Ubuntu environment...`,
-      `[00:00:02] Command dispatched successfully with thermal limit ${payload.thermal_guard.max_threads} threads.`,
-      `[00:00:03] Process finished with exit code 0. Output files verified.`,
+      `[00:00:01] Initializing ${tool.name} in WSL2 Ubuntu environment (${tool.conda_env})...`,
+      `[00:00:01] $ ${insp.single_sample_command}`,
+      `[00:00:02] Command dispatched with resource limit: ${payload.thermal_guard.max_threads} threads, ${payload.thermal_guard.max_ram_gb} GB RAM.`,
+      `[00:00:03] Process finished with exit code 0. Verified output: ${outputPath}`,
     ],
-    code_inspection: generateFallbackInspection(payload.tool_id, payload.parameters, payload.samples[0]),
+    code_inspection: insp,
   };
 
   const res = await request<JobRecord>(
@@ -1111,13 +1261,13 @@ export async function compileWorkflow(payload: {
 }> {
   const stepInspections: Record<string, CodeInspectionResult> = {};
   for (const n of payload.nodes) {
-    stepInspections[n.id] = generateFallbackInspection(n.tool_id, n.parameters);
+    stepInspections[n.id] = generateFallbackInspection(n.tool_id, n.parameters, 'ERR14794383', n.custom_flags || '');
   }
 
   const fallback = {
-    master_bash_script: `#!/usr/bin/env bash\n# OmniGenome Master Pipeline: ${payload.name}\nset -euo pipefail\n\n` +
-      payload.nodes.map((n, i) => `# Step ${i + 1}: ${n.label}\necho "Running ${n.label}..."\n`).join('\n'),
-    nextflow_script: `// Nextflow DSL2 Pipeline: ${payload.name}\nnextflow.enable.dsl=2\n\nworkflow {\n    log.info "Starting ${payload.name}"\n}\n`,
+    master_bash_script: `#!/usr/bin/env bash\n# GenomeLab v2.4 Master Pipeline: ${payload.name}\nset -euo pipefail\n\n` +
+      payload.nodes.map((n, i) => `# Step ${i + 1}: ${n.label}\necho "Running ${n.label}..."\n${stepInspections[n.id]?.single_sample_command || ''}\n`).join('\n'),
+    nextflow_script: `// GenomeLab v2.4 — Nextflow DSL2 Pipeline: ${payload.name}\nnextflow.enable.dsl=2\n\nworkflow {\n    log.info "Starting ${payload.name}"\n}\n`,
     step_inspections: stepInspections,
   };
 
@@ -1128,11 +1278,12 @@ export async function compileWorkflow(payload: {
   }>('/workflows/compile', { method: 'POST', body: JSON.stringify(payload) }, fallback);
 }
 
-export async function browseWSL(path = '/home/soumandeykakon'): Promise<WSLBrowseEntry[]> {
+export async function browseWSL(path = '~'): Promise<WSLBrowseEntry[]> {
   const fallback: WSLBrowseEntry[] = [
-    { name: 'NGS_DA', path: '/home/soumandeykakon/NGS_DA', is_dir: true, file_type: 'Directory' },
-    { name: 'wgs_practice', path: '/home/soumandeykakon/wgs_practice', is_dir: true, file_type: 'Directory' },
-    { name: 'miniforge3', path: '/home/soumandeykakon/miniforge3', is_dir: true, file_type: 'Directory' },
+    { name: 'GenomeLab_Workspaces', path: '~/GenomeLab_Workspaces', is_dir: true, file_type: 'Directory' },
+    { name: 'NGS_DA', path: '~/NGS_DA', is_dir: true, file_type: 'Directory' },
+    { name: 'wgs_practice', path: '~/wgs_practice', is_dir: true, file_type: 'Directory' },
+    { name: 'miniforge3', path: '~/miniforge3', is_dir: true, file_type: 'Directory' },
   ];
   const res = await request<any>('/wsl/browse', { method: 'POST', body: JSON.stringify({ path }) }, { entries: fallback });
   return Array.isArray(res) ? res : (res?.entries || fallback);
@@ -1145,7 +1296,7 @@ export async function installTool(payload: {
 }): Promise<{ success: boolean; message: string; output: string }> {
   const fallback = {
     success: true,
-    message: `Tool ${payload.tool_id} installed successfully into ${payload.conda_env || 'wgs_env'}.`,
+    message: `Tool ${payload.tool_id} installed into ${payload.conda_env || 'wgs_env'}.`,
     output: `Transaction finished. Installed package ${payload.conda_package || payload.tool_id}.`,
   };
   return request('/wsl/install', { method: 'POST', body: JSON.stringify(payload) }, fallback);
@@ -1158,7 +1309,7 @@ export async function setupEnvironment(payload: {
   const fallback = {
     success: true,
     message: `Environment ${payload.env_name || 'wgs_env'} verified and active.`,
-    output: `All 70+ WGS binaries mapped and tested successfully.`,
+    output: `All 70+ WGS binaries mapped and tested.`,
   };
   return request('/wsl/setup-env', { method: 'POST', body: JSON.stringify(payload) }, fallback);
 }
@@ -1176,11 +1327,11 @@ export async function createWSLFolder(payload: {
   wsl_ls_output: string;
   logs: string[];
 }> {
-  const cleanPath = (payload.path || '/home/soumandeykakon/My_New_WGS_Project').replace(/\/+$/, '');
+  const cleanPath = (payload.path || '~/GenomeLab_Workspaces/New_WGS_Project').replace(/\/+$/, '');
   const sub = [
     '01_raw_data', '02_quality_control', '03_trimmed_reads', '04_assembly',
     '05_assembly_qc', '06_annotation', '07_amr_profiling', '08_typing',
-    '10_plasmids', '11_snp_phylogeny', '12_pangenome', '13_figures', 'logs',
+    '09_plasmids', '10_snp_phylogeny', '11_pangenome', '12_figures', 'logs',
   ];
   const created = payload.create_standard_subfolders !== false
     ? [cleanPath, ...sub.map((s) => `${cleanPath}/${s}`)]
@@ -1188,7 +1339,7 @@ export async function createWSLFolder(payload: {
   const cmd = payload.create_standard_subfolders !== false
     ? `mkdir -p '${cleanPath}'/{${sub.join(',')}}`
     : `mkdir -p '${cleanPath}'`;
-  const winPath = `\\\\wsl.localhost\\Ubuntu${cleanPath.replace(/\//g, '\\')}`;
+  const winPath = `\\\\wsl.localhost\\Ubuntu${cleanPath.replace(/^~/, '/home/ubuntu').replace(/\//g, '\\')}`;
   const fallback = {
     success: true,
     executed_live_in_wsl: true,
@@ -1198,7 +1349,7 @@ export async function createWSLFolder(payload: {
     created_folders: created,
     wsl_ls_output: created.join('\n'),
     logs: [
-      `[GenomeLab WSL2 Folder Creator] Connected to Ubuntu 22.04 LTS...`,
+      `[GenomeLab WSL2 Directory Provisioner] Connected to Ubuntu 22.04 LTS...`,
       `$ ${cmd}`,
       `[SUCCESS] Created ${created.length} folder(s) inside WSL2 at: ${cleanPath}`,
       `[Windows File Explorer Path] ${winPath}`,
@@ -1224,11 +1375,11 @@ export async function testWSLCliConnection(command?: string): Promise<{
     output: [
       '=== 1. WSL2 Linux Kernel & User ===',
       'Linux 6.6.87.2-microsoft-standard-WSL2 x86_64 GNU/Linux',
-      'soumandeykakon',
-      '/home/soumandeykakon',
+      'ubuntu',
+      '~/GenomeLab_Workspaces',
       '=== 2. Active WGS Project Folders ===',
-      '/home/soumandeykakon/NGS_DA',
-      '/home/soumandeykakon/wgs_practice',
+      '~/NGS_DA',
+      '~/wgs_practice',
       '=== 3. Live Bioinformatics CLI Tool Check ===',
       'FastQC v0.12.1',
       'fastp 0.23.4',
@@ -1252,7 +1403,7 @@ export async function registerCustomTool(tool: Partial<ToolDefinition>): Promise
     conda_env: tool.conda_env || 'wgs_env',
     conda_package: tool.conda_package || 'custom_tool',
     short_description: tool.short_description || 'User-registered custom CLI bioinformatics tool.',
-    detailed_description: tool.detailed_description || 'User-registered custom CLI tool in OmniGenome Workbench.',
+    detailed_description: tool.detailed_description || 'User-registered custom CLI tool in GenomeLab.',
     input_formats: tool.input_formats || ['FASTA_CONTIGS'],
     output_formats: tool.output_formats || ['TSV_SUMMARY'],
     documentation_url: tool.documentation_url || 'https://bio.tools/',
@@ -1262,13 +1413,26 @@ export async function registerCustomTool(tool: Partial<ToolDefinition>): Promise
     recommended_organisms: ['all'],
     recommendation_badge: 'Custom Tool',
   };
-  return request<ToolDefinition>('/tools/custom', { method: 'POST', body: JSON.stringify(tool) }, fallback);
+  const res = await request<ToolDefinition>('/tools/custom', { method: 'POST', body: JSON.stringify(tool) }, fallback);
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('genomelab_local_custom_tools');
+      const list: ToolDefinition[] = raw ? JSON.parse(raw) : [];
+      if (!list.some((t) => t.id === res.id)) {
+        list.push(res);
+        localStorage.setItem('genomelab_local_custom_tools', JSON.stringify(list));
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+  return res;
 }
 
 export async function createProject(
   project: Partial<Project> & { sample_ids?: string[] | string; host?: string; country?: string }
 ): Promise<Project> {
-  const cleanPath = (project.wsl_path || `/home/soumandeykakon/GenomeLab_Workspaces/${(project.name || 'New_Project').replace(/\s+/g, '_')}`).replace(/\/+$/, '');
+  const cleanPath = (project.wsl_path || `~/GenomeLab_Workspaces/${(project.name || 'New_Project').replace(/\s+/g, '_')}`).replace(/\/+$/, '');
   const rawIds = Array.isArray(project.sample_ids)
     ? project.sample_ids
     : typeof project.sample_ids === 'string'
@@ -1280,12 +1444,12 @@ export async function createProject(
     id: sid,
     name: sid,
     country: project.country || 'Local Lab',
-    host: project.host || project.organism || 'Isolate',
+    host: project.host || project.organism || 'Sample',
     year: '2026',
     r1_path: `${cleanPath}/01_raw_data/${sid}_1.fastq.gz`,
     r2_path: `${cleanPath}/01_raw_data/${sid}_2.fastq.gz`,
     assembly_path: `${cleanPath}/04_assembly/${sid}/contigs.fasta`,
-    status: 'Ready for Step 1 (QC & Assembly)',
+    status: 'Raw Reads Ready',
     genome_size_bp: 4800000,
     gc_percent: 52.0,
     n50: 0,
@@ -1303,7 +1467,7 @@ export async function createProject(
     wsl_path: cleanPath,
     created_at: new Date().toISOString(),
     sample_count: fallbackSamples.length,
-    status: 'Ready for Step 1',
+    status: 'Ready for Analysis',
     samples: fallbackSamples,
   };
   const res = await request<Project>('/projects', { method: 'POST', body: JSON.stringify(project) }, fallback);
@@ -1318,6 +1482,76 @@ export async function createProject(
   return res;
 }
 
+export async function addSampleToProject(
+  projectId: string,
+  samplePayload: {
+    id: string;
+    name?: string;
+    country?: string;
+    host?: string;
+    year?: string;
+    r1_path?: string;
+    r2_path?: string;
+    assembly_path?: string;
+  },
+  currentProject?: Project
+): Promise<Project> {
+  const baseWsl = currentProject?.wsl_path || '~/GenomeLab_Workspaces/Project';
+  const sid = samplePayload.id.trim() || `SAMPLE_${Date.now()}`;
+  const newSample = {
+    id: sid,
+    name: samplePayload.name || sid,
+    country: samplePayload.country || 'Local Lab',
+    host: samplePayload.host || currentProject?.organism || 'Sample',
+    year: samplePayload.year || new Date().getFullYear().toString(),
+    r1_path: samplePayload.r1_path || `${baseWsl}/01_raw_data/${sid}_1.fastq.gz`,
+    r2_path: samplePayload.r2_path || `${baseWsl}/01_raw_data/${sid}_2.fastq.gz`,
+    assembly_path: samplePayload.assembly_path || `${baseWsl}/04_assembly/${sid}/contigs.fasta`,
+    status: 'Raw Reads Ready',
+    genome_size_bp: 4800000,
+    gc_percent: 52.0,
+    n50: 0,
+    contigs: 0,
+    st: 'Pending',
+    amr_genes: [],
+    plasmids: [],
+  };
+  const fallbackProj: Project = currentProject
+    ? {
+        ...currentProject,
+        samples: currentProject.samples.some((s) => s.id === sid)
+          ? currentProject.samples
+          : [...currentProject.samples, newSample],
+        sample_count: currentProject.samples.some((s) => s.id === sid)
+          ? currentProject.samples.length
+          : currentProject.samples.length + 1,
+      }
+    : FALLBACK_PROJECTS[0];
+
+  const res = await request<Project>(
+    `/projects/${projectId}/samples`,
+    { method: 'POST', body: JSON.stringify(newSample) },
+    fallbackProj
+  );
+
+  if (typeof window !== 'undefined') {
+    try {
+      const localStr = localStorage.getItem('genomelab_local_projects');
+      const localList: Project[] = localStr ? JSON.parse(localStr) : [];
+      const idx = localList.findIndex((p) => p.id === res.id);
+      if (idx >= 0) {
+        localList[idx] = res;
+      } else {
+        localList.unshift(res);
+      }
+      localStorage.setItem('genomelab_local_projects', JSON.stringify(localList));
+    } catch {
+      // ignore storage errors
+    }
+  }
+  return res;
+}
+
 export interface AppSessionState {
   active_project_id?: string;
   active_tab?: string;
@@ -1327,20 +1561,47 @@ export interface AppSessionState {
 }
 
 export async function fetchAppState(): Promise<AppSessionState> {
-  return request<AppSessionState>('/state', undefined, {
+  let localFallback: AppSessionState = {
     active_project_id: 'proj_salmonella_50',
     active_tab: 'cohort',
     selected_organism: 'bacteria',
-    selected_samples: ['ERR14794383', 'ERR14838559', 'SRR14421695'],
-  });
+    selected_samples: ['ERR14794383', 'ERR14838559'],
+  };
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('genomelab_app_state');
+      if (raw) {
+        localFallback = { ...localFallback, ...JSON.parse(raw) };
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return request<AppSessionState>('/state', undefined, localFallback);
 }
 
 export async function saveAppState(state: AppSessionState): Promise<AppSessionState> {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('genomelab_app_state', JSON.stringify(state));
+    } catch {
+      // ignore
+    }
+  }
   return request<AppSessionState>('/state', { method: 'POST', body: JSON.stringify(state) }, state);
 }
 
 export async function fetchProjectToolConfigs(projectId: string): Promise<Record<string, any>> {
-  return request<Record<string, any>>(`/projects/${projectId}/configs`, undefined, {});
+  let fallback: Record<string, any> = {};
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(`genomelab_tool_configs_${projectId}`);
+      if (raw) fallback = JSON.parse(raw);
+    } catch {
+      // ignore
+    }
+  }
+  return request<Record<string, any>>(`/projects/${projectId}/configs`, undefined, fallback);
 }
 
 export async function saveProjectToolConfig(
@@ -1348,6 +1609,17 @@ export async function saveProjectToolConfig(
   toolId: string,
   config: Record<string, any>
 ): Promise<Record<string, any>> {
+  if (typeof window !== 'undefined') {
+    try {
+      const key = `genomelab_tool_configs_${projectId}`;
+      const raw = localStorage.getItem(key);
+      const current = raw ? JSON.parse(raw) : {};
+      current[toolId] = config;
+      localStorage.setItem(key, JSON.stringify(current));
+    } catch {
+      // ignore
+    }
+  }
   return request<Record<string, any>>(
     `/projects/${projectId}/configs/${toolId}`,
     { method: 'POST', body: JSON.stringify(config) },
@@ -1371,15 +1643,81 @@ export interface VisualizationResponse {
   generated_at?: string;
 }
 
+function buildFallbackVisualizationSvg(payload: {
+  plot_type: string;
+  project_id: string;
+  sample_id?: string;
+  customization?: Record<string, any>;
+  engineLabel: string;
+}): VisualizationResponse {
+  const custom = payload.customization || {};
+  const title = custom.title || `GenomeLab Publication Figure — ${payload.plot_type.replace(/_/g, ' ').toUpperCase()}`;
+  const subtitle = custom.subtitle || `Project: ${payload.project_id} · Scope: ${payload.sample_id || 'All Cohort Samples (n=50)'} · ${payload.engineLabel}`;
+  const isDark = custom.theme === 'dark_publication';
+  const bg = isDark ? '#0D1117' : '#FFFFFF';
+  const fg = isDark ? '#F0F6FC' : '#1F2328';
+  const muted = isDark ? '#8B949E' : '#57606A';
+  const grid = isDark ? '#30363D' : '#E5E7EB';
+
+  const bars = [
+    { label: "aac(6')-Iaa (Aminoglycoside)", val: 100, color: '#0969DA' },
+    { label: 'tet(A) (Tetracycline)', val: 78, color: '#1F883D' },
+    { label: 'sul1 (Sulfonamide)', val: 66, color: '#8250DF' },
+    { label: 'qnrS1 (Fluoroquinolone)', val: 54, color: '#D97706' },
+    { label: 'blaTEM-1B (Beta-lactam)', val: 52, color: '#CF222E' },
+    { label: 'floR (Phenicol)', val: 38, color: '#0D9488' },
+  ];
+
+  const barElements = bars
+    .map((b, i) => {
+      const y = 120 + i * 48;
+      const w = Math.round((b.val / 100) * 440);
+      return `
+        <text x="230" y="${y + 18}" text-anchor="end" fill="${fg}" font-family="Inter, sans-serif" font-size="12" font-weight="600">${b.label}</text>
+        <rect x="245" y="${y}" width="440" height="26" rx="4" fill="${grid}" opacity="0.35" />
+        <rect x="245" y="${y}" width="${w}" height="26" rx="4" fill="${b.color}" />
+        <text x="${255 + w}" y="${y + 18}" fill="${fg}" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700">${b.val.toFixed(1)}%</text>
+      `;
+    })
+    .join('');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="100%" height="100%">
+    <rect width="800" height="450" rx="8" fill="${bg}" stroke="${grid}" stroke-width="1"/>
+    <text x="40" y="46" fill="${fg}" font-family="Inter, sans-serif" font-size="17" font-weight="700">${title}</text>
+    <text x="40" y="70" fill="${muted}" font-family="Inter, sans-serif" font-size="12">${subtitle}</text>
+    <line x1="40" y1="88" x2="760" y2="88" stroke="${grid}" stroke-width="1"/>
+    ${barElements}
+    <line x1="245" y1="108" x2="245" y2="405" stroke="${muted}" stroke-width="1.5"/>
+    <text x="465" y="432" text-anchor="middle" fill="${muted}" font-family="Inter, sans-serif" font-size="11" font-weight="600">Cohort Prevalence / Normalized Metric (%)</text>
+  </svg>`;
+
+  const encoded = typeof window !== 'undefined' ? `data:image/svg+xml;utf8,${encodeURIComponent(svg)}` : '';
+  return {
+    plot_type: payload.plot_type,
+    project_id: payload.project_id,
+    sample_id: payload.sample_id,
+    engine: payload.engineLabel,
+    format: 'svg',
+    image_data: encoded,
+    title,
+    script_executed: `# GenomeLab v2.4 — ${payload.engineLabel} Script (${payload.plot_type})\n# Generated with DPI=${custom.dpi || 600}, Palette=${custom.palette || 'viridis'}`,
+    metrics: { n50: 245800, l50: 6, gc_percent: 52.1, total_length: 4812450, num_contigs: 42 },
+    customization_applied: custom,
+    generated_at: new Date().toISOString(),
+  };
+}
+
 export async function generatePythonVisualization(payload: {
   plot_type: string;
   project_id: string;
   sample_id?: string;
   customization?: Record<string, any>;
 }): Promise<VisualizationResponse> {
+  const fallback = buildFallbackVisualizationSvg({ ...payload, engineLabel: 'Python (Matplotlib / Seaborn)' });
   return request<VisualizationResponse>(
     '/visualizations/python/generate',
-    { method: 'POST', body: JSON.stringify(payload) }
+    { method: 'POST', body: JSON.stringify(payload) },
+    fallback
   );
 }
 
@@ -1389,15 +1727,24 @@ export async function generateRVisualization(payload: {
   sample_id?: string;
   customization?: Record<string, any>;
 }): Promise<VisualizationResponse> {
+  const fallback = buildFallbackVisualizationSvg({ ...payload, engineLabel: 'R (ggplot2 / ggtree)' });
   return request<VisualizationResponse>(
     '/visualizations/r/generate',
-    { method: 'POST', body: JSON.stringify(payload) }
+    { method: 'POST', body: JSON.stringify(payload) },
+    fallback
   );
 }
 
 export async function fetchVisualizationsMetrics(projectId: string, sampleId?: string): Promise<Record<string, any>> {
   const q = sampleId ? `project_id=${projectId}&sample_id=${sampleId}` : `project_id=${projectId}`;
-  return request<Record<string, any>>(`/visualizations/metrics?${q}`, undefined, {});
+  return request<Record<string, any>>(
+    `/visualizations/metrics?${q}`,
+    undefined,
+    {
+      quast: { n50: 245800, l50: 6, gc_percent: 52.1, total_length: 4812450, num_contigs: 42 },
+      checkm2: { completeness: 99.8, contamination: 0.4 },
+    }
+  );
 }
 
 export async function cancelJob(jobId: string): Promise<{ status: string; job_id: string }> {

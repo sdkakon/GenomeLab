@@ -53,10 +53,10 @@ export const UserGuidePdfModal: React.FC<UserGuidePdfModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-semibold text-[#1F2328]">
-                GenomeLab Enterprise User Manual & PDF Guide
+                GenomeLab User Guide & Documentation
               </h2>
               <p className="text-xs text-[#656D76]">
-                Simple, step-by-step instructions for Windows setup, pipeline execution & R/Python charts
+                Step-by-step instructions for Windows engine setup, pipeline execution & R/Python charts
               </p>
             </div>
           </div>
@@ -85,10 +85,10 @@ export const UserGuidePdfModal: React.FC<UserGuidePdfModalProps> = ({
           <div className="border-b border-[#D0D7DE] pb-6 space-y-2">
             <div className="flex items-center gap-2 text-[#0969DA] font-bold text-lg">
               <Dna className="w-6 h-6" />
-              <span>GenomeLab Enterprise (v2.4)</span>
+              <span>GenomeLab (v2.4)</span>
             </div>
             <h1 className="text-2xl font-bold text-[#1F2328] tracking-tight">
-              Complete User Guide & Windows Setup Manual
+              User Guide & Execution Manual
             </h1>
             <p className="text-[#656D76] text-xs">
               Graphical Whole-Genome Sequencing (WGS), Assembly, AMR Profiling & Phylogenomics Platform
